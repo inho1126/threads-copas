@@ -2,6 +2,7 @@ const state = {
   profiles: [],
   records: [],
   draftJobId: "",
+  productPreview: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -15,7 +16,13 @@ async function api(path, options = {}) {
   });
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(detail || `HTTP ${response.status}`);
+    let message = detail || `HTTP ${response.status}`;
+    try {
+      message = JSON.parse(detail).detail || message;
+    } catch (_error) {
+      // Keep the raw response body when it is not JSON.
+    }
+    throw new Error(message);
   }
   return response.json();
 }
@@ -39,44 +46,28 @@ async function checkHealth() {
 
 async function loadSettings() {
   const settings = await api("/api/settings");
-  const form = $("#settings-form");
-  for (const [key, value] of Object.entries(settings)) {
-    if (form.elements[key]) {
-      form.elements[key].value = value;
-    }
-  }
+  applySettingsToForm(settings, $("#settings-form"));
 }
 
 async function saveSettings(event) {
   event.preventDefault();
+  const form = event.currentTarget;
   const message = $("#settings-message");
   message.textContent = "saving...";
-  await api("/api/settings", {
+  const settings = await api("/api/settings", {
     method: "PUT",
-    body: JSON.stringify(formToObject(event.currentTarget)),
+    body: JSON.stringify(formToObject(form)),
   });
+  applySettingsToForm(settings, form);
   message.textContent = "saved";
   clearMessage(message);
 }
 
-async function saveProfile(event) {
-  event.preventDefault();
-  const message = $("#threads-profile-message");
-  const payload = formToObject(event.currentTarget);
-  payload.notes = "";
-  try {
-    message.textContent = "saving...";
-    await api("/api/threads/profiles", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    event.currentTarget.reset();
-    await refreshProfiles();
-    message.textContent = "saved";
-    clearMessage(message);
-  } catch (error) {
-    console.error(error);
-    message.textContent = "프로필 저장에 실패했습니다.";
+function applySettingsToForm(settings, form) {
+  for (const [key, value] of Object.entries(settings)) {
+    if (form.elements[key]) {
+      form.elements[key].value = value;
+    }
   }
 }
 
@@ -131,6 +122,36 @@ async function refreshProfileToken(profileKey) {
   await refreshProfiles();
 }
 
+async function previewCoupangProduct() {
+  const form = $("#threads-draft-form");
+  const message = $("#coupang-preview-message");
+  const productUrl = form.elements.product_url.value.trim();
+  state.productPreview = null;
+  renderProductPreview();
+  if (!productUrl) {
+    message.textContent = "쿠팡 URL을 입력하세요.";
+    return;
+  }
+  setBusy(true);
+  try {
+    message.textContent = "상품 확인 중...";
+    const preview = await api("/api/coupang/product-preview", {
+      method: "POST",
+      body: JSON.stringify({ product_url: productUrl }),
+    });
+    state.productPreview = preview;
+    renderProductPreview();
+    $("#selected-product-label").textContent = preview.product_name || "selected product";
+    message.textContent = "상품 확인 완료";
+    clearMessage(message);
+  } catch (error) {
+    console.error(error);
+    message.textContent = error.message || "상품을 확인하지 못했습니다.";
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function generateDraft(event) {
   event.preventDefault();
   const message = $("#threads-draft-message");
@@ -146,9 +167,11 @@ async function generateDraft(event) {
     $("#threads-comment-preview").value = draft.comment_text || "";
     $("#selected-product-label").textContent = draft.job.product_name || "selected product";
     message.textContent = "draft ready";
+  } catch (error) {
+    console.error(error);
+    message.textContent = error.message || "글 생성에 실패했습니다.";
   } finally {
     setBusy(false);
-    clearMessage(message);
   }
 }
 
@@ -206,11 +229,38 @@ async function refreshAll() {
   await Promise.all([refreshProfiles(), refreshRecords()]);
 }
 
+function renderProductPreview() {
+  const container = $("#coupang-product-preview");
+  const preview = state.productPreview;
+  if (!preview) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+  const facts = Array.isArray(preview.facts) ? preview.facts.filter(Boolean) : [];
+  container.hidden = false;
+  container.innerHTML = `
+    <div class="product-preview-thumb">
+      ${
+        preview.image_url
+          ? `<img src="${escapeAttribute(preview.image_url)}" alt="${escapeAttribute(preview.product_name || "쿠팡 상품")}" />`
+          : '<div class="product-preview-placeholder">이미지 없음</div>'
+      }
+    </div>
+    <div class="product-preview-info">
+      <strong>${escapeHtml(preview.product_name || "상품명 없음")}</strong>
+      ${preview.product_id ? `<span class="link-text">상품 ID: ${escapeHtml(preview.product_id)}</span>` : ""}
+      ${facts.length ? `<span class="link-text">${facts.map(escapeHtml).join(" · ")}</span>` : ""}
+      ${preview.partner_url ? `<span class="link-text">${escapeHtml(preview.partner_url)}</span>` : ""}
+    </div>
+  `;
+}
+
 function renderProfiles() {
   $("#threads-profile-count").textContent = `${state.profiles.length} profiles`;
   const list = $("#threads-profiles-list");
   if (state.profiles.length === 0) {
-    list.innerHTML = '<div class="empty-cell">프로필 키와 표시 이름을 저장한 뒤 Connect를 눌러 Threads 계정을 연결하세요.</div>';
+    list.innerHTML = '<div class="empty-cell">Import Current Account로 Threads 계정을 연결하세요.</div>';
   } else {
     list.innerHTML = state.profiles
       .map((profile) => {
@@ -313,8 +363,14 @@ function escapeAttribute(value) {
 
 function bindEvents() {
   $("#settings-form").addEventListener("submit", saveSettings);
-  $("#threads-profile-form").addEventListener("submit", saveProfile);
   $("#threads-import-button").addEventListener("click", importCurrentProfile);
+  $("#coupang-preview-button").addEventListener("click", previewCoupangProduct);
+  $("#threads-draft-form").elements.product_url.addEventListener("input", () => {
+    state.productPreview = null;
+    state.draftJobId = "";
+    $("#selected-product-label").textContent = "no product";
+    renderProductPreview();
+  });
   $("#threads-draft-form").addEventListener("submit", generateDraft);
   $("#threads-publish-button").addEventListener("click", publishDraft);
   $("#refresh-button").addEventListener("click", refreshAll);

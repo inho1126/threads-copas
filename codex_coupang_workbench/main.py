@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from .coupang_partners import CoupangPartnerProduct, CoupangPartnersError, fetch_partner_product_context
 from .codex_threads import CodexThreadsError, DEFAULT_CODEX_MODEL, generate_codex_threads_post
 from .naver import publish_handoff_message
 from .product_research import fetch_best_product_context
@@ -15,6 +16,7 @@ from .schemas import (
     GeneratedImagePayload,
     JobCreatePayload,
     MediaCandidatePayload,
+    CoupangProductPreviewPayload,
     PublishHandoff,
     SettingsPayload,
     ThreadsDraftPayload,
@@ -32,13 +34,14 @@ STATIC_DIR = PACKAGE_DIR / "static"
 ICON_PATH = PACKAGE_DIR.parent / "assets" / "appicon.ico"
 THREADS_IMPORT_STATE_PREFIX = "import-current-profile:"
 SECRET_SETTING_KEYS = {"coupang_secret_key", "threads_app_secret", "openai_api_key"}
+SECRET_MASK = "********"
 
 
 def public_settings(settings: dict[str, str]) -> dict[str, str]:
     visible = dict(settings)
     for key in SECRET_SETTING_KEYS:
-        if key in visible:
-            visible[key] = ""
+        if key in visible and visible[key]:
+            visible[key] = SECRET_MASK
     return visible
 
 
@@ -48,9 +51,48 @@ def settings_to_store(payload: SettingsPayload, current_settings: dict[str, str]
         if key not in payload.model_fields_set and current_settings.get(key):
             settings[key] = current_settings[key]
     for key in SECRET_SETTING_KEYS:
+        if settings.get(key) == SECRET_MASK and current_settings.get(key):
+            settings[key] = current_settings[key]
         if not settings.get(key) and current_settings.get(key):
             settings[key] = current_settings[key]
     return settings
+
+
+def resolve_coupang_partner_product(
+    product_url: str,
+    settings: dict[str, str],
+) -> tuple[CoupangPartnerProduct, str]:
+    access_key = settings.get("coupang_access_key", "").strip()
+    secret_key = settings.get("coupang_secret_key", "").strip()
+    if not access_key or not secret_key:
+        raise CoupangPartnersError("쿠팡 파트너스 API 키를 저장한 뒤 다시 시도해 주세요.")
+    partner_product, resolved_url = fetch_partner_product_context(
+        product_url,
+        access_key=access_key,
+        secret_key=secret_key,
+        sub_id=settings.get("coupang_sub_id", ""),
+    )
+    if not partner_product.product_name:
+        raise CoupangPartnersError("쿠팡 파트너스 API에서 상품 정보를 찾지 못했습니다.")
+    return partner_product, resolved_url
+
+
+def product_preview_response(
+    product: CoupangPartnerProduct,
+    *,
+    original_url: str,
+    resolved_url: str,
+) -> dict[str, Any]:
+    return {
+        "product_name": product.product_name,
+        "product_id": product.product_id,
+        "image_url": product.image_url,
+        "partner_url": product.partner_url,
+        "product_url": product.product_url,
+        "resolved_url": resolved_url,
+        "original_url": original_url,
+        "facts": list(product.facts),
+    }
 
 
 def create_app(db_path: str | Path = DEFAULT_DB_PATH) -> FastAPI:
@@ -110,6 +152,22 @@ def create_app(db_path: str | Path = DEFAULT_DB_PATH) -> FastAPI:
     @app.get("/api/jobs")
     def list_jobs(store: WorkbenchStore = Depends(get_store)) -> list[dict[str, Any]]:
         return store.list_jobs()
+
+    @app.post("/api/coupang/product-preview")
+    def preview_coupang_product(
+        payload: CoupangProductPreviewPayload,
+        store: WorkbenchStore = Depends(get_store),
+    ) -> dict[str, Any]:
+        product_url = payload.product_url.strip()
+        try:
+            product, resolved_url = resolve_coupang_partner_product(product_url, store.get_settings())
+        except CoupangPartnersError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        return product_preview_response(
+            product,
+            original_url=product_url,
+            resolved_url=resolved_url or product_url,
+        )
 
     @app.post("/api/jobs")
     def create_job(
@@ -354,17 +412,47 @@ def create_app(db_path: str | Path = DEFAULT_DB_PATH) -> FastAPI:
         payload: ThreadsDraftPayload,
         store: WorkbenchStore = Depends(get_store),
     ) -> dict[str, Any]:
+        settings = store.get_settings()
         product_name = payload.product_name.strip()
         image_url = payload.image_url.strip()
-        product_context = fetch_best_product_context(payload.product_url, product_name)
-        settings = store.get_settings()
+        product_url = payload.product_url.strip()
+        product_context = None
+        partner_url = ""
+        api_error = ""
+        if settings.get("coupang_access_key", "").strip() and settings.get("coupang_secret_key", "").strip():
+            try:
+                partner_product, resolved_url = resolve_coupang_partner_product(product_url, settings)
+                product_context = partner_product.to_product_context(
+                    source_url=product_url,
+                    resolved_url=resolved_url or product_url,
+                )
+                product_name = product_name or partner_product.product_name
+                image_url = image_url or partner_product.image_url
+                partner_url = partner_product.partner_url
+            except CoupangPartnersError as exc:
+                api_error = str(exc)
+        if product_context is None:
+            product_context = fetch_best_product_context(product_url, product_name)
         if not product_name:
-            known_context = store.get_known_product_context(payload.product_url)
+            known_context = store.get_known_product_context(product_url)
             product_name = known_context.get("product_name", "") or product_context.page_title
+        if not product_name:
+            detail = (
+                "쿠팡 파트너스 API에서 상품 정보를 찾지 못했습니다."
+                if settings.get("coupang_access_key", "").strip() and settings.get("coupang_secret_key", "").strip()
+                else "쿠팡 파트너스 API 키를 저장한 뒤 다시 시도해 주세요."
+            )
+            if api_error:
+                detail = f"{detail} ({api_error})"
+            raise HTTPException(
+                status_code=400,
+                detail=detail,
+            )
         if not image_url:
             image_url = product_context.image_url
+        final_product_url = partner_url or product_url
         job = store.add_job(
-            product_url=payload.product_url,
+            product_url=final_product_url,
             product_name=product_name or "상품명 자동 확인 필요",
             image_url=image_url,
             memo=payload.memo,

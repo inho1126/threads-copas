@@ -212,6 +212,12 @@ select:focus {
   gap: 12px;
 }
 
+.input-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
 button {
   border: 1px solid #c8d4dd;
   background: #ffffff;
@@ -401,6 +407,53 @@ th {
   border: 1px solid var(--line);
   background: #ffffff;
   padding: 10px;
+}
+
+.product-preview {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: #fbfcfd;
+  padding: 10px;
+}
+
+.product-preview[hidden] {
+  display: none;
+}
+
+.product-preview-thumb img,
+.product-preview-placeholder {
+  display: block;
+  width: 96px;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.product-preview-thumb img {
+  object-fit: cover;
+}
+
+.product-preview-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  padding: 8px;
+}
+
+.product-preview-info {
+  min-width: 0;
+}
+
+.product-preview-info strong {
+  display: block;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .thread-preview-label {

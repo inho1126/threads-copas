@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Threads Coupang Publisher</title>
-    <link rel="stylesheet" href="static/styles.css?v=20260704-threads-only" />
+    <link rel="stylesheet" href="static/styles.css?v=20260704-coupang-preview" />
   </head>
   <body>
     <div class="app-shell">
@@ -37,7 +37,7 @@
         <section class="section-grid">
           <section class="panel" id="settings">
             <div class="panel-header">
-              <h2>Threads Settings</h2>
+              <h2>API Settings</h2>
               <span>local only</span>
             </div>
             <form id="settings-form" class="form-grid">
@@ -47,11 +47,23 @@
               </label>
               <label>
                 Threads App Secret
-                <input name="threads_app_secret" autocomplete="off" placeholder="Meta Threads App Secret" />
+                <input name="threads_app_secret" type="password" autocomplete="new-password" placeholder="Meta Threads App Secret" data-secret-field />
               </label>
               <label class="wide">
                 Redirect URI
                 <input name="threads_redirect_uri" autocomplete="off" placeholder="https://sinabro-ai.com/threads-copas/api/threads/auth/callback" />
+              </label>
+              <label>
+                Coupang Access Key
+                <input name="coupang_access_key" autocomplete="off" placeholder="Coupang Partners Access Key" />
+              </label>
+              <label>
+                Coupang Secret Key
+                <input name="coupang_secret_key" type="password" autocomplete="new-password" placeholder="Coupang Partners Secret Key" data-secret-field />
+              </label>
+              <label>
+                Coupang Sub ID
+                <input name="coupang_sub_id" autocomplete="off" placeholder="sub ID" />
               </label>
               <label>
                 Codex Model
@@ -69,21 +81,10 @@
               <h2>Profiles</h2>
               <span id="threads-profile-count">0 profiles</span>
             </div>
-            <form id="threads-profile-form" class="form-grid">
-              <label>
-                프로필 키
-                <input name="profile_key" required placeholder="tesla" />
-              </label>
-              <label>
-                표시 이름
-                <input name="display_name" required placeholder="테슬라 용품" />
-              </label>
-              <div class="wide form-actions">
-                <button class="primary-button" type="submit">Save Profile</button>
-                <button class="ghost-button" id="threads-import-button" type="button">Import Current Account</button>
-                <span id="threads-profile-message" class="inline-message"></span>
-              </div>
-            </form>
+            <div class="form-actions">
+              <button class="primary-button" id="threads-import-button" type="button">Import Current Account</button>
+              <span id="threads-profile-message" class="inline-message"></span>
+            </div>
             <div id="threads-profiles-list" class="profile-list"></div>
           </section>
         </section>
@@ -98,12 +99,17 @@
               발행 프로필
               <select name="profile_key" id="threads-profile-select"></select>
             </label>
-            <label>
+            <label class="wide">
               쿠팡 URL
-              <input name="product_url" required placeholder="https://link.coupang.com/a/..." />
+              <div class="input-action-row">
+                <input name="product_url" required placeholder="https://link.coupang.com/a/..." />
+                <button class="small-button" id="coupang-preview-button" type="button">확인</button>
+              </div>
             </label>
+            <div class="wide product-preview" id="coupang-product-preview" hidden></div>
             <div class="wide form-actions">
               <button class="primary-button" type="submit">Generate Thread</button>
+              <span id="coupang-preview-message" class="inline-message"></span>
               <span id="threads-draft-message" class="inline-message"></span>
             </div>
           </form>
@@ -148,6 +154,6 @@
       </main>
     </div>
 
-    <script src="static/app.js?v=20260704-profile-import"></script>
+    <script src="static/app.js?v=20260704-coupang-preview"></script>
   </body>
 </html>

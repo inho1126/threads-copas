@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from codex_coupang_workbench.codex_threads import CodexThreadsError
+from codex_coupang_workbench.coupang_partners import CoupangPartnerProduct
 from codex_coupang_workbench.main import create_app
 from codex_coupang_workbench.product_research import ProductContext
 
@@ -117,8 +118,8 @@ async def test_api_settings_redacts_and_preserves_secrets(tmp_path):
             },
         )
         assert first.status_code == 200
-        assert first.json()["threads_app_secret"] == ""
-        assert first.json()["coupang_secret_key"] == ""
+        assert first.json()["threads_app_secret"] == "********"
+        assert first.json()["coupang_secret_key"] == "********"
         assert first.json()["codex_model"] == "gpt-5.5"
 
         second = await client.put(
@@ -129,11 +130,11 @@ async def test_api_settings_redacts_and_preserves_secrets(tmp_path):
             },
         )
         assert second.status_code == 200
-        assert second.json()["threads_app_secret"] == ""
+        assert second.json()["threads_app_secret"] == "********"
 
         settings = await client.get("/api/settings")
-        assert settings.json()["threads_app_secret"] == ""
-        assert settings.json()["coupang_secret_key"] == ""
+        assert settings.json()["threads_app_secret"] == "********"
+        assert settings.json()["coupang_secret_key"] == "********"
         assert settings.json()["codex_model"] == "gpt-5.5"
 
         import_start = await client.get("/api/threads/auth/import/start")
@@ -184,6 +185,110 @@ async def test_threads_draft_prefers_codex_auth_generation(tmp_path, monkeypatch
         assert calls[0]["model"] == "gpt-5.5"
         assert calls[0]["product_name"] == "테슬라 센터 콘솔 수납함"
         assert "모델Y 주니퍼 호환" in calls[0]["product_facts"]
+
+
+@pytest.mark.anyio
+async def test_threads_draft_uses_coupang_partner_context_and_deeplink(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "codex_coupang_workbench.main.fetch_partner_product_context",
+        lambda *args, **kwargs: (
+            CoupangPartnerProduct(
+                product_name="테슬라 콘솔 정리함",
+                partner_url="https://link.coupang.com/a/partner",
+                image_url="https://image.example/console.jpg",
+                facts=("차량용품 카테고리 상품", "테슬라 관련 상품"),
+                product_id="12345",
+            ),
+            "https://www.coupang.com/vp/products/12345",
+        ),
+    )
+    monkeypatch.setattr(
+        "codex_coupang_workbench.main.generate_codex_threads_post",
+        lambda **kwargs: (_ for _ in ()).throw(CodexThreadsError("skip codex")),
+    )
+    app = create_app(tmp_path / "api.sqlite3")
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.put(
+            "/api/settings",
+            json={
+                "coupang_access_key": "access",
+                "coupang_secret_key": "secret",
+                "coupang_sub_id": "threads2026",
+            },
+        )
+        response = await client.post(
+            "/api/threads/draft",
+            json={"profile_key": "tesla", "product_url": "https://link.coupang.com/a/original"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["job"]["product_name"] == "테슬라 콘솔 정리함"
+        assert payload["job"]["product_url"] == "https://link.coupang.com/a/partner"
+        assert "테슬라 콘솔 정리함" in payload["text"]
+        assert "https://link.coupang.com/a/partner" in payload["comment_text"]
+
+
+@pytest.mark.anyio
+async def test_coupang_product_preview_returns_partner_product(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "codex_coupang_workbench.main.fetch_partner_product_context",
+        lambda *args, **kwargs: (
+            CoupangPartnerProduct(
+                product_name="무선 충전 거치대",
+                product_url="https://www.coupang.com/vp/products/777",
+                partner_url="https://link.coupang.com/a/preview",
+                image_url="https://image.example/charger.jpg",
+                facts=("디지털 카테고리 상품", "로켓배송 가능 여부 표시"),
+                product_id="777",
+            ),
+            "https://www.coupang.com/vp/products/777",
+        ),
+    )
+    app = create_app(tmp_path / "api.sqlite3")
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.put(
+            "/api/settings",
+            json={
+                "coupang_access_key": "access",
+                "coupang_secret_key": "secret",
+            },
+        )
+        response = await client.post(
+            "/api/coupang/product-preview",
+            json={"product_url": "https://link.coupang.com/a/original"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["product_name"] == "무선 충전 거치대"
+        assert payload["image_url"] == "https://image.example/charger.jpg"
+        assert payload["partner_url"] == "https://link.coupang.com/a/preview"
+        assert payload["resolved_url"] == "https://www.coupang.com/vp/products/777"
+        assert "디지털 카테고리 상품" in payload["facts"]
+
+
+@pytest.mark.anyio
+async def test_threads_draft_requires_coupang_api_when_product_context_is_blocked(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "codex_coupang_workbench.main.fetch_best_product_context",
+        lambda url, product_name: ProductContext(source_url=url, resolved_url=url, facts=[]),
+    )
+    app = create_app(tmp_path / "api.sqlite3")
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/threads/draft",
+            json={"profile_key": "tesla", "product_url": "https://link.coupang.com/a/blocked"},
+        )
+
+        assert response.status_code == 400
+        assert "쿠팡 파트너스 API 키" in response.text
 
 
 @pytest.mark.anyio

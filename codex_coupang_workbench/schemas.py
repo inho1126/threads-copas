@@ -59,6 +59,10 @@ class ThreadsDraftPayload(BaseModel):
     memo: str = ""
 
 
+class CoupangProductPreviewPayload(BaseModel):
+    product_url: str = Field(min_length=1)
+
+
 class ThreadsPublishPayload(BaseModel):
     profile_key: str = Field(min_length=1)
     job_id: str = Field(min_length=1)
