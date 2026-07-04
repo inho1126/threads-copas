@@ -15,7 +15,7 @@ from .product_research import ProductContext
 
 COUPANG_PARTNERS_DOMAIN = "https://api-gateway.coupang.com"
 DEEPLINK_PATH = "/v2/providers/affiliate_open_api/apis/openapi/v1/deeplink"
-PRODUCT_SEARCH_PATH = "/v2/providers/affiliate_open_api/apis/openapi/products/search"
+PRODUCT_SEARCH_PATH = "/v2/providers/affiliate_open_api/apis/openapi/v1/products/search"
 
 JsonTransport = Callable[[str, str, dict[str, str], dict[str, Any] | None], dict[str, Any]]
 

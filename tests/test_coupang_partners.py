@@ -23,7 +23,7 @@ class FakeCoupangTransport:
                     }
                 ],
             }
-        if "/v2/providers/affiliate_open_api/apis/openapi/products/search" in url:
+        if "/v2/providers/affiliate_open_api/apis/openapi/v1/products/search" in url:
             return {
                 "rCode": "0",
                 "data": {
@@ -62,6 +62,7 @@ def test_client_builds_deeplink_and_search_requests():
     assert link == "https://link.coupang.com/a/partner"
     assert products[0]["productName"] == "테스트 상품 정리함"
     assert transport.calls[0]["data"]["subId"] == "threads2026"
+    assert "/openapi/v1/products/search" in transport.calls[1]["url"]
     assert "subId=threads2026" in transport.calls[1]["url"]
 
 
@@ -88,7 +89,7 @@ def test_fetch_partner_product_context_maps_product_data(monkeypatch):
 def test_fetch_partner_product_context_does_not_use_unmatched_search_result(monkeypatch):
     class UnmatchedTransport(FakeCoupangTransport):
         def __call__(self, method, url, headers, data=None):
-            if "/v2/providers/affiliate_open_api/apis/openapi/products/search" in url:
+            if "/v2/providers/affiliate_open_api/apis/openapi/v1/products/search" in url:
                 return {
                     "rCode": "0",
                     "data": {
