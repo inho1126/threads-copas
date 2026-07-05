@@ -53,6 +53,7 @@ class ThreadsProfilePayload(BaseModel):
 
 class ThreadsDraftPayload(BaseModel):
     product_url: str = Field(min_length=1)
+    partner_url: str = ""
     profile_key: str = ""
     product_name: str = ""
     image_url: str = ""

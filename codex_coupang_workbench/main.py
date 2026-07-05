@@ -436,7 +436,7 @@ def create_app(db_path: str | Path = DEFAULT_DB_PATH) -> FastAPI:
         image_url = payload.image_url.strip()
         product_url = payload.product_url.strip()
         product_context = None
-        partner_url = ""
+        partner_url = payload.partner_url.strip()
         api_error = ""
         if settings.get("coupang_access_key", "").strip() and settings.get("coupang_secret_key", "").strip():
             try:
@@ -447,7 +447,7 @@ def create_app(db_path: str | Path = DEFAULT_DB_PATH) -> FastAPI:
                 )
                 product_name = product_name or partner_product.product_name
                 image_url = image_url or partner_product.image_url
-                partner_url = partner_product.partner_url
+                partner_url = partner_url or partner_product.partner_url
             except CoupangPartnersError as exc:
                 api_error = str(exc)
         if product_context is None:

@@ -352,6 +352,49 @@ async def test_threads_draft_uses_manual_name_with_partial_coupang_deeplink(tmp_
 
 
 @pytest.mark.anyio
+async def test_threads_draft_reuses_preview_partner_url(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "codex_coupang_workbench.main.fetch_partner_product_context",
+        lambda *args, **kwargs: (
+            CoupangPartnerProduct(
+                product_name="테슬라 콘솔 트레이",
+                partner_url="https://link.coupang.com/a/generated-again",
+                image_url="https://image.example/tray.jpg",
+            ),
+            "https://www.coupang.com/vp/products/9579586125?itemId=28594687231",
+        ),
+    )
+    monkeypatch.setattr(
+        "codex_coupang_workbench.main.generate_codex_threads_post",
+        lambda **kwargs: (_ for _ in ()).throw(CodexThreadsError("skip codex")),
+    )
+    app = create_app(tmp_path / "api.sqlite3")
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.put(
+            "/api/settings",
+            json={
+                "coupang_access_key": "access",
+                "coupang_secret_key": "secret",
+            },
+        )
+        response = await client.post(
+            "/api/threads/draft",
+            json={
+                "product_url": "https://www.coupang.com/vp/products/9579586125?itemId=28594687231",
+                "partner_url": "https://link.coupang.com/a/from-preview",
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["job"]["product_url"] == "https://link.coupang.com/a/from-preview"
+        assert "https://link.coupang.com/a/from-preview" in payload["comment_text"]
+        assert "https://link.coupang.com/a/generated-again" not in payload["comment_text"]
+
+
+@pytest.mark.anyio
 async def test_threads_draft_requires_coupang_api_when_product_context_is_blocked(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "codex_coupang_workbench.main.fetch_best_product_context",

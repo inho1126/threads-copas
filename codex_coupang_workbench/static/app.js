@@ -127,6 +127,7 @@ async function previewCoupangProduct() {
   const message = $("#coupang-preview-message");
   const productUrl = form.elements.product_url.value.trim();
   state.productPreview = null;
+  form.elements.partner_url.value = "";
   renderProductPreview();
   if (!productUrl) {
     message.textContent = "쿠팡 URL을 입력하세요.";
@@ -140,6 +141,7 @@ async function previewCoupangProduct() {
       body: JSON.stringify({ product_url: productUrl }),
     });
     state.productPreview = preview;
+    form.elements.partner_url.value = preview.partner_url || "";
     renderProductPreview();
     $("#selected-product-label").textContent = preview.product_name || "selected product";
     if (preview.needs_product_name) {
@@ -247,6 +249,7 @@ function renderProductPreview() {
     container.hidden = true;
     container.innerHTML = "";
     fallback.hidden = true;
+    $("#threads-draft-form").elements.partner_url.value = "";
     return;
   }
   const facts = Array.isArray(preview.facts) ? preview.facts.filter(Boolean) : [];
@@ -393,6 +396,7 @@ function bindEvents() {
     $("#selected-product-label").textContent = "no product";
     $("#product-name-fallback").hidden = true;
     $("#threads-draft-form").elements.product_name.value = "";
+    $("#threads-draft-form").elements.partner_url.value = "";
     renderProductPreview();
   });
   $("#threads-draft-form").addEventListener("submit", generateDraft);
