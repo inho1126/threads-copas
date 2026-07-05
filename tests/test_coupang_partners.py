@@ -119,3 +119,53 @@ def test_fetch_partner_product_context_does_not_use_unmatched_search_result(monk
     assert resolved_url.startswith("https://www.coupang.com/vp/products/9579586125")
     assert product.product_name == ""
     assert product.partner_url == "https://link.coupang.com/a/partner"
+
+
+def test_fetch_partner_product_context_uses_keyword_fallback_for_exact_product(monkeypatch):
+    class KeywordFallbackTransport(FakeCoupangTransport):
+        def __call__(self, method, url, headers, data=None):
+            if "/v2/providers/affiliate_open_api/apis/openapi/v1/products/search" in url:
+                if "keyword=9579586125" in url or "keyword=28594687231" in url:
+                    return {
+                        "rCode": "0",
+                        "data": {
+                            "productData": [
+                                {
+                                    "productId": 8185470223,
+                                    "productName": "다른 상품",
+                                    "productUrl": "https://link.coupang.com/re/AFFSDP?pageKey=8185470223",
+                                }
+                            ]
+                        },
+                    }
+                return {
+                    "rCode": "0",
+                    "data": {
+                        "productData": [
+                            {
+                                "productId": 9579586125,
+                                "productName": "세상의모든제품 테슬라 모델Y주니퍼 센터 콘솔 수납함",
+                                "productImage": "https://image.example/tesla.jpg",
+                                "productUrl": "https://link.coupang.com/re/AFFSDP?pageKey=9579586125&itemId=28594687231",
+                                "categoryName": "자동차용품",
+                            }
+                        ]
+                    },
+                }
+            return super().__call__(method, url, headers, data)
+
+    monkeypatch.setattr(
+        "codex_coupang_workbench.coupang_partners.resolve_coupang_redirect",
+        lambda url: "https://www.coupang.com/vp/products/9579586125?itemId=28594687231",
+    )
+    product, _resolved_url = fetch_partner_product_context(
+        "https://link.coupang.com/a/example",
+        access_key="access",
+        secret_key="secret",
+        product_keyword="세상의모든제품 테슬라 모델Y주니퍼 센터 콘솔 수납함",
+        transport=KeywordFallbackTransport(),
+    )
+
+    assert product.product_id == "9579586125"
+    assert product.product_name.startswith("세상의모든제품")
+    assert product.image_url == "https://image.example/tesla.jpg"

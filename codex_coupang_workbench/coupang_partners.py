@@ -114,6 +114,7 @@ def fetch_partner_product_context(
     access_key: str,
     secret_key: str,
     sub_id: str = "",
+    product_keyword: str = "",
     transport: JsonTransport | None = None,
 ) -> tuple[CoupangPartnerProduct, str]:
     clean_url = product_url.strip()
@@ -124,11 +125,14 @@ def fetch_partner_product_context(
     partner_url = client.create_deeplink(resolved_url) or client.create_deeplink(clean_url)
     product_ids = extract_coupang_ids(resolved_url) + extract_coupang_ids(clean_url)
     products: list[dict[str, Any]] = []
-    for keyword in _dedupe(product_ids):
-        products = client.search_products(keyword)
+    for product_id_keyword in _dedupe(product_ids):
+        products = client.search_products(product_id_keyword)
         if products:
             break
     selected = _select_product(products, product_ids)
+    if not selected and product_keyword.strip():
+        products = client.search_products(product_keyword.strip())
+        selected = _select_product(products, product_ids)
     if not selected:
         return CoupangPartnerProduct(partner_url=partner_url), resolved_url
     return _product_from_api(selected, partner_url=partner_url), resolved_url

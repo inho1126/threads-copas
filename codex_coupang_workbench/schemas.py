@@ -62,6 +62,7 @@ class ThreadsDraftPayload(BaseModel):
 
 class CoupangProductPreviewPayload(BaseModel):
     product_url: str = Field(min_length=1)
+    product_name: str = ""
 
 
 class ThreadsPublishPayload(BaseModel):

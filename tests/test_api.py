@@ -310,7 +310,7 @@ async def test_coupang_product_preview_allows_deeplink_when_name_is_missing(tmp_
 
 
 @pytest.mark.anyio
-async def test_threads_draft_uses_manual_name_with_partial_coupang_deeplink(tmp_path, monkeypatch):
+async def test_threads_draft_rejects_manual_name_without_api_confirmation(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "codex_coupang_workbench.main.fetch_partner_product_context",
         lambda *args, **kwargs: (
@@ -343,12 +343,53 @@ async def test_threads_draft_uses_manual_name_with_partial_coupang_deeplink(tmp_
             },
         )
 
+        assert response.status_code == 400
+        assert "정확한 상품을 확인하지 못했습니다" in response.text
+
+
+@pytest.mark.anyio
+async def test_coupang_product_preview_uses_manual_name_as_search_keyword(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_fetch(*args, **kwargs):
+        calls.append(kwargs)
+        return (
+            CoupangPartnerProduct(
+                product_name="세상의모든제품 테슬라 모델Y주니퍼 센터 콘솔 수납함",
+                partner_url="https://link.coupang.com/a/confirmed",
+                image_url="https://image.example/tesla.jpg",
+                facts=("자동차용품 카테고리 상품",),
+                product_id="9579586125",
+            ),
+            "https://www.coupang.com/vp/products/9579586125?itemId=28594687231",
+        )
+
+    monkeypatch.setattr("codex_coupang_workbench.main.fetch_partner_product_context", fake_fetch)
+    app = create_app(tmp_path / "api.sqlite3")
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.put(
+            "/api/settings",
+            json={
+                "coupang_access_key": "access",
+                "coupang_secret_key": "secret",
+            },
+        )
+        response = await client.post(
+            "/api/coupang/product-preview",
+            json={
+                "product_url": "https://www.coupang.com/vp/products/9579586125?itemId=28594687231",
+                "product_name": "세상의모든제품 테슬라 모델Y주니퍼 센터 콘솔 수납함",
+            },
+        )
+
         assert response.status_code == 200
+        assert calls[0]["product_keyword"] == "세상의모든제품 테슬라 모델Y주니퍼 센터 콘솔 수납함"
         payload = response.json()
-        assert payload["job"]["product_name"] == "테슬라 모델Y 센터 콘솔 수납함"
-        assert payload["job"]["product_url"] == "https://link.coupang.com/a/partial"
-        assert "테슬라 모델Y 센터 콘솔 수납함" in payload["text"]
-        assert "https://link.coupang.com/a/partial" in payload["comment_text"]
+        assert payload["product_name"].startswith("세상의모든제품")
+        assert payload["image_url"] == "https://image.example/tesla.jpg"
+        assert payload["needs_product_name"] is False
 
 
 @pytest.mark.anyio

@@ -66,6 +66,7 @@ def settings_to_store(payload: SettingsPayload, current_settings: dict[str, str]
 def fetch_coupang_partner_product(
     product_url: str,
     settings: dict[str, str],
+    product_keyword: str = "",
 ) -> tuple[CoupangPartnerProduct, str]:
     access_key = settings.get("coupang_access_key", "").strip()
     secret_key = settings.get("coupang_secret_key", "").strip()
@@ -76,6 +77,7 @@ def fetch_coupang_partner_product(
         access_key=access_key,
         secret_key=secret_key,
         sub_id=settings.get("coupang_sub_id", ""),
+        product_keyword=product_keyword,
     )
     return partner_product, resolved_url
 
@@ -176,8 +178,13 @@ def create_app(db_path: str | Path = DEFAULT_DB_PATH) -> FastAPI:
         store: WorkbenchStore = Depends(get_store),
     ) -> dict[str, Any]:
         product_url = payload.product_url.strip()
+        product_name = payload.product_name.strip()
         try:
-            product, resolved_url = fetch_coupang_partner_product(product_url, store.get_settings())
+            product, resolved_url = fetch_coupang_partner_product(
+                product_url,
+                store.get_settings(),
+                product_keyword=product_name,
+            )
         except CoupangPartnersError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from None
         if not product.product_name and not product.partner_url:
@@ -440,16 +447,30 @@ def create_app(db_path: str | Path = DEFAULT_DB_PATH) -> FastAPI:
         api_error = ""
         if settings.get("coupang_access_key", "").strip() and settings.get("coupang_secret_key", "").strip():
             try:
-                partner_product, resolved_url = fetch_coupang_partner_product(product_url, settings)
-                product_context = partner_product.to_product_context(
-                    source_url=product_url,
-                    resolved_url=resolved_url or product_url,
+                partner_product, resolved_url = fetch_coupang_partner_product(
+                    product_url,
+                    settings,
+                    product_keyword=product_name,
                 )
-                product_name = product_name or partner_product.product_name
-                image_url = image_url or partner_product.image_url
-                partner_url = partner_url or partner_product.partner_url
+                if partner_product.product_name:
+                    product_context = partner_product.to_product_context(
+                        source_url=product_url,
+                        resolved_url=resolved_url or product_url,
+                    )
+                    product_name = partner_product.product_name
+                    image_url = image_url or partner_product.image_url
+                    partner_url = partner_url or partner_product.partner_url
+                else:
+                    api_error = "상품명으로 쿠팡 API에서 정확한 상품을 확인하지 못했습니다."
             except CoupangPartnersError as exc:
                 api_error = str(exc)
+        if (
+            settings.get("coupang_access_key", "").strip()
+            and settings.get("coupang_secret_key", "").strip()
+            and product_context is None
+        ):
+            detail = api_error or "쿠팡 파트너스 API에서 상품 정보를 먼저 확인해 주세요."
+            raise HTTPException(status_code=400, detail=detail)
         if product_context is None:
             product_context = fetch_best_product_context(product_url, product_name)
         if not product_name:

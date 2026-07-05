@@ -138,14 +138,20 @@ async function previewCoupangProduct() {
     message.textContent = "상품 확인 중...";
     const preview = await api("/api/coupang/product-preview", {
       method: "POST",
-      body: JSON.stringify({ product_url: productUrl }),
+      body: JSON.stringify({
+        product_url: productUrl,
+        product_name: form.elements.product_name.value.trim(),
+      }),
     });
     state.productPreview = preview;
     form.elements.partner_url.value = preview.partner_url || "";
+    if (preview.product_name) {
+      form.elements.product_name.value = preview.product_name;
+    }
     renderProductPreview();
     $("#selected-product-label").textContent = preview.product_name || "selected product";
     if (preview.needs_product_name) {
-      message.textContent = "상품명만 직접 입력하면 생성할 수 있습니다.";
+      message.textContent = "상품명을 입력한 뒤 다시 확인하세요.";
     } else {
       message.textContent = "상품 확인 완료";
       clearMessage(message);
@@ -162,8 +168,15 @@ async function generateDraft(event) {
   event.preventDefault();
   const message = $("#threads-draft-message");
   const form = event.currentTarget;
-  if (!$("#product-name-fallback").hidden && !form.elements.product_name.value.trim()) {
-    message.textContent = "상품명을 입력하세요.";
+  if (!state.productPreview || state.productPreview.needs_product_name) {
+    message.textContent = "먼저 상품 확인을 완료하세요.";
+    if (!$("#product-name-fallback").hidden) {
+      form.elements.product_name.focus();
+    }
+    return;
+  }
+  if (!form.elements.product_name.value.trim()) {
+    message.textContent = "확인된 상품명이 없습니다.";
     form.elements.product_name.focus();
     return;
   }
@@ -254,9 +267,6 @@ function renderProductPreview() {
   }
   const facts = Array.isArray(preview.facts) ? preview.facts.filter(Boolean) : [];
   fallback.hidden = !preview.needs_product_name;
-  if (!preview.needs_product_name) {
-    $("#threads-draft-form").elements.product_name.value = "";
-  }
   container.hidden = false;
   container.innerHTML = `
     <div class="product-preview-thumb">
@@ -274,7 +284,7 @@ function renderProductPreview() {
       ${preview.partner_url ? `<span class="link-text">${escapeHtml(preview.partner_url)}</span>` : ""}
       ${
         preview.needs_product_name
-          ? '<span class="link-text">쿠팡 API가 상품명을 정확히 반환하지 않아 상품명만 직접 확인합니다.</span>'
+          ? '<span class="link-text">상품명을 입력하고 확인을 다시 누르면 쿠팡 검색 API로 상품 정보를 확인합니다.</span>'
           : ""
       }
     </div>
