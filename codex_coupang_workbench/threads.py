@@ -41,7 +41,7 @@ class ThreadsApiClient:
             {
                 "client_id": self.app_id,
                 "redirect_uri": self.redirect_uri,
-                "scope": "threads_basic,threads_content_publish",
+                "scope": "threads_basic,threads_content_publish,threads_manage_replies",
                 "response_type": "code",
                 "state": state,
             }

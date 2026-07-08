@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 from codex_coupang_workbench.threads import ThreadsApiClient, _redact_sensitive_detail
 
 
@@ -34,10 +36,11 @@ def test_build_authorization_url_includes_profile_state_and_scopes():
     client = ThreadsApiClient(app_id="app-id", app_secret="secret", redirect_uri="https://example.com/callback")
 
     auth_url = client.build_authorization_url("tesla")
+    query = parse_qs(urlparse(auth_url).query)
 
     assert auth_url.startswith("https://threads.net/oauth/authorize?")
     assert "client_id=app-id" in auth_url
-    assert "scope=threads_basic%2Cthreads_content_publish" in auth_url
+    assert query["scope"] == ["threads_basic,threads_content_publish,threads_manage_replies"]
     assert "state=tesla" in auth_url
 
 
