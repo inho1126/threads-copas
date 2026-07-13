@@ -1,6 +1,5 @@
 fastapi>=0.100
 httpx>=0.24
-Pillow>=10
 pydantic>=2
 pytest>=8
 uvicorn>=0.23

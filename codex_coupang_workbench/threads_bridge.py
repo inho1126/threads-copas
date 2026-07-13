@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import base64
+import ipaddress
 import json
+import os
+import time
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import quote, urlencode, urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 BridgeTransport = Callable[
@@ -15,10 +19,62 @@ BridgeTransport = Callable[
 BRIDGE_USER_AGENT = "ThreadsCopasBridge/1.0 (+https://sinabro-ai.com)"
 DEFAULT_BRIDGE_TIMEOUT = 20
 PUBLISH_BRIDGE_TIMEOUT = 120
+MEDIA_UPLOAD_BRIDGE_TIMEOUT = 120
+MEDIA_PUBLISH_BRIDGE_TIMEOUT = 180
+MEDIA_UPLOAD_CHUNK_BYTES = 512 * 1024
+ALLOW_INSECURE_LOOPBACK_ENV = "THREADS_BRIDGE_ALLOW_INSECURE_LOOPBACK"
 
 
 class ThreadsBridgeError(RuntimeError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        detail: Any | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.detail = detail
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _validated_base_url(value: str) -> str:
+    raw = value.strip().rstrip("/")
+    if not raw:
+        raise ThreadsBridgeError("Threads service URL is required")
+    try:
+        parsed = urlsplit(raw)
+        _ = parsed.port
+    except ValueError as exc:
+        raise ThreadsBridgeError("Threads service URL must use a safe HTTPS origin") from exc
+    if (
+        not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ThreadsBridgeError("Threads service URL must use a safe HTTPS origin")
+    if parsed.scheme == "https":
+        return raw
+    allow_loopback = os.environ.get(ALLOW_INSECURE_LOOPBACK_ENV, "").strip() == "1"
+    if parsed.scheme == "http" and allow_loopback and _is_loopback_host(parsed.hostname):
+        return raw
+    raise ThreadsBridgeError("Threads service URL must use HTTPS")
+
+
+def _is_loopback_host(hostname: str) -> bool:
+    if hostname.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
 
 
 class ThreadsBridgeClient:
@@ -29,11 +85,9 @@ class ThreadsBridgeClient:
         api_key: str = "",
         transport: Callable[..., dict[str, Any] | list[dict[str, Any]]] | None = None,
     ) -> None:
-        self.base_url = base_url.strip().rstrip("/")
+        self.base_url = _validated_base_url(base_url)
         self.api_key = api_key.strip()
         self._transport = transport or _urlopen_json_transport
-        if not self.base_url:
-            raise ThreadsBridgeError("Threads service URL is required")
 
     def list_profiles(self) -> list[dict[str, Any]]:
         response = self._request("GET", "/api/threads/profiles")
@@ -41,8 +95,9 @@ class ThreadsBridgeClient:
             raise ThreadsBridgeError("Threads service returned an unexpected profiles response")
         return response
 
-    def list_publish_records(self) -> list[dict[str, Any]]:
-        response = self._request("GET", "/api/threads/publish-records")
+    def list_publish_records(self, refresh_insights: bool = False) -> list[dict[str, Any]]:
+        params = {"refresh_insights": "true", "_": str(int(time.time() * 1000))} if refresh_insights else None
+        response = self._request("GET", "/api/threads/publish-records", params=params)
         if not isinstance(response, list):
             raise ThreadsBridgeError("Threads service returned an unexpected records response")
         return response
@@ -86,17 +141,80 @@ class ThreadsBridgeClient:
         response = self._request("GET", "/api/threads/auth/import/start")
         return _string_dict(response)
 
-    def upload_media(self, *, filename: str, content_type: str, image_base64: str) -> dict[str, str]:
+    def upload_media(self, media_bytes: bytes) -> dict[str, Any]:
+        if not isinstance(media_bytes, (bytes, bytearray, memoryview)):
+            raise ThreadsBridgeError("Temporary media content must be bytes")
+        content = bytes(media_bytes)
+        if not content:
+            raise ThreadsBridgeError("Temporary media content is empty")
+        started = _ensure_dict(
+            self._request(
+                "POST",
+                "/api/threads/media-uploads/start",
+                data={"total_bytes": len(content)},
+                timeout=MEDIA_UPLOAD_BRIDGE_TIMEOUT,
+            )
+        )
+        upload_id = str(started.get("upload_id") or "").strip()
+        if not upload_id:
+            raise ThreadsBridgeError("Threads service did not return a media upload id")
+        for index, offset in enumerate(range(0, len(content), MEDIA_UPLOAD_CHUNK_BYTES)):
+            chunk = content[offset : offset + MEDIA_UPLOAD_CHUNK_BYTES]
+            self._request(
+                "POST",
+                f"/api/threads/media-uploads/{quote(upload_id, safe='')}/parts",
+                data={
+                    "index": index,
+                    "content_base64": base64.b64encode(chunk).decode("ascii"),
+                },
+                timeout=MEDIA_UPLOAD_BRIDGE_TIMEOUT,
+            )
         response = self._request(
             "POST",
-            "/api/threads/media",
-            data={
-                "filename": filename,
-                "content_type": content_type,
-                "image_base64": image_base64,
-            },
+            f"/api/threads/media-uploads/{quote(upload_id, safe='')}/complete",
+            data={},
+            timeout=MEDIA_UPLOAD_BRIDGE_TIMEOUT,
         )
-        return _string_dict(response)
+        return _ensure_dict(response)
+
+    def delete_media(self, media_id: str) -> dict[str, Any]:
+        clean_media_id = media_id.strip()
+        if not clean_media_id:
+            raise ThreadsBridgeError("Temporary media id is required")
+        response = self._request(
+            "DELETE",
+            f"/api/threads/media/{quote(clean_media_id, safe='')}",
+        )
+        return _ensure_dict(response)
+
+    def publish_media(
+        self,
+        *,
+        idempotency_key: str,
+        profile_key: str,
+        product_url: str,
+        product_name: str,
+        text: str,
+        comment_text: str,
+        media_mode: str,
+        media_urls: list[str],
+    ) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            "/api/threads/remote-media-publish",
+            data={
+                "idempotency_key": idempotency_key,
+                "profile_key": profile_key,
+                "product_url": product_url,
+                "product_name": product_name,
+                "text": text,
+                "comment_text": comment_text,
+                "media_mode": media_mode,
+                "media_urls": list(media_urls),
+            },
+            timeout=MEDIA_PUBLISH_BRIDGE_TIMEOUT,
+        )
+        return _ensure_dict(response)
 
     def publish(
         self,
@@ -104,7 +222,6 @@ class ThreadsBridgeClient:
         profile_key: str,
         product_url: str,
         product_name: str,
-        image_url: str,
         text: str,
         comment_text: str = "",
     ) -> dict[str, Any]:
@@ -115,7 +232,6 @@ class ThreadsBridgeClient:
                 "profile_key": profile_key,
                 "product_url": product_url,
                 "product_name": product_name,
-                "image_url": image_url,
                 "text": text,
                 "comment_text": comment_text,
             },
@@ -145,6 +261,8 @@ class ThreadsBridgeClient:
             url = f"{url}?{urlencode(params)}"
         headers = {
             "Accept": "application/json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
             "User-Agent": BRIDGE_USER_AGENT,
         }
         if self.api_key:
@@ -167,11 +285,16 @@ def _urlopen_json_transport(
         request_headers["Content-Type"] = "application/json"
     request = Request(url, data=body, headers=request_headers, method=method.upper())
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with build_opener(_NoRedirectHandler()).open(request, timeout=timeout) as response:
             payload = response.read()
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise ThreadsBridgeError(f"Threads service HTTP {exc.code}: {_extract_error_detail(detail)}") from exc
+        parsed_detail = _extract_error_detail(detail)
+        raise ThreadsBridgeError(
+            f"Threads service HTTP {exc.code}: {parsed_detail}",
+            status_code=exc.code,
+            detail=parsed_detail,
+        ) from exc
     except (OSError, URLError) as exc:
         raise ThreadsBridgeError(f"Threads service request failed: {exc}") from exc
     try:
@@ -183,13 +306,13 @@ def _urlopen_json_transport(
     return parsed
 
 
-def _extract_error_detail(detail: str) -> str:
+def _extract_error_detail(detail: str) -> Any:
     try:
         parsed = json.loads(detail)
     except json.JSONDecodeError:
         return detail
     if isinstance(parsed, dict):
-        return str(parsed.get("detail") or parsed)
+        return parsed.get("detail") or parsed
     return detail
 
 

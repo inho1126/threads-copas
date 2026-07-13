@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="공개 RedNote 영상과 대표 장면을 저장하고 Threads 문구를 만드는 로컬 도구">
+    <title>RedNote 저장 &amp; Threads 문구</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <p class="eyebrow">로컬 영상 도구</p>
+        <h1>RedNote 영상 저장</h1>
+        <p class="lede">공개 게시물의 영상과 대표 장면을 저장하고, Codex로 Threads 문구 3종을 만듭니다.</p>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card" aria-labelledby="link-heading">
+        <h2 id="link-heading">게시물 링크</h2>
+        <form id="download-form">
+          <label for="post-url">RedNote 공개 영상 주소</label>
+          <div class="input-row">
+            <input
+              id="post-url"
+              name="url"
+              type="url"
+              placeholder="https://www.rednote.com/explore/..."
+              autocomplete="off"
+              inputmode="url"
+              aria-describedby="url-hint"
+              required
+            >
+            <button id="save-button" type="submit">영상과 대표 장면 저장</button>
+          </div>
+          <p id="url-hint" class="hint">공개 RedNote 영상 게시물 링크 한 개를 입력해주세요.</p>
+        </form>
+
+        <section id="status-panel" class="status-panel" aria-labelledby="status-heading">
+          <h3 id="status-heading" class="status-title">진행 상태</h3>
+          <p id="status-message" role="status" aria-live="polite" aria-atomic="true">
+            RedNote 공개 영상 주소를 입력해주세요.
+          </p>
+          <progress id="workflow-progress" max="100" value="0" aria-label="저장 진행률">0%</progress>
+          <p id="error-message" class="error-message" role="alert" hidden></p>
+        </section>
+
+        <section id="save-result" class="save-result" aria-labelledby="result-heading" hidden>
+          <h3 id="result-heading">미디어 저장 완료</h3>
+          <p>저장 폴더</p>
+          <code id="output-directory" class="path-output"></code>
+          <p>저장된 파일</p>
+          <ul id="saved-files" class="file-list"></ul>
+        </section>
+
+        <section id="thread-copy-result" class="thread-copy-result" aria-labelledby="thread-copy-heading" hidden>
+          <div class="section-heading-row">
+            <div>
+              <p class="section-kicker">Threads 초안</p>
+              <h3 id="thread-copy-heading">호기심을 끄는 문구 3종</h3>
+            </div>
+            <button id="regenerate-button" class="secondary-button" type="button">문구 다시 생성</button>
+          </div>
+          <p id="thread-copy-meta" class="copy-meta"></p>
+          <div id="thread-copy-cards" class="thread-copy-cards"></div>
+          <p id="clipboard-status" class="clipboard-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        </section>
+      </section>
+
+      <section class="notice" aria-labelledby="scope-heading">
+        <h2 id="scope-heading">사용 범위</h2>
+        <p>본인이 소유하거나 다운로드 허가를 받은 공개 콘텐츠에만 사용해주세요.</p>
+        <p>대표 JPG와 공개 게시물 텍스트는 로그인된 Codex 서비스로 전달되며, 영상 파일과 RedNote 토큰 주소는 전달되지 않습니다.</p>
+      </section>
+
+      <div class="media-workbench" aria-hidden="true">
+        <video id="work-video" hidden preload="metadata" playsinline></video>
+        <canvas id="analysis-canvas" hidden></canvas>
+        <canvas id="capture-canvas" hidden></canvas>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">MP4는 이 컴퓨터에 저장됩니다. 대표 JPG와 공개 게시물 텍스트는 로그인된 Codex 서비스로 전달됩니다.</div>
+    </footer>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

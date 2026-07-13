@@ -5,6 +5,7 @@ import hmac
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlencode, urlparse
@@ -23,6 +24,23 @@ JsonTransport = Callable[[str, str, dict[str, str], dict[str, Any] | None], dict
 
 class CoupangPartnersError(RuntimeError):
     pass
+
+
+def normalize_search_product(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    product_name = str(raw.get("productName") or "").strip()
+    product_url = str(raw.get("productUrl") or "").strip()
+    if not product_name or not product_url:
+        return None
+    return {
+        "product_id": str(raw.get("productId") or "").strip(),
+        "product_name": product_name,
+        "product_url": product_url,
+        "image_url": str(raw.get("productImage") or "").strip(),
+        "price": _nonnegative_int(raw.get("productPrice")),
+        "is_rocket": _common_bool(raw.get("isRocket")),
+    }
 
 
 @dataclass(frozen=True)
@@ -128,12 +146,18 @@ def fetch_partner_product_context(
     products: list[dict[str, Any]] = []
     selected: dict[str, Any] = {}
     for product_id_keyword in _dedupe(product_ids):
-        products = client.search_products(product_id_keyword)
+        try:
+            products = client.search_products(product_id_keyword)
+        except CoupangPartnersError:
+            return CoupangPartnerProduct(partner_url=partner_url), resolved_url
         selected = _select_product(products, product_ids)
         if selected:
             break
     if not selected and product_keyword.strip():
-        products = client.search_products(product_keyword.strip())
+        try:
+            products = client.search_products(product_keyword.strip())
+        except CoupangPartnersError:
+            return CoupangPartnerProduct(partner_url=partner_url), resolved_url
         selected = _select_product(products, product_ids)
     if not selected:
         return CoupangPartnerProduct(partner_url=partner_url), resolved_url
@@ -257,6 +281,26 @@ def _dedupe(items: list[str]) -> list[str]:
         if clean and clean not in deduped:
             deduped.append(clean)
     return deduped
+
+
+def _nonnegative_int(value: Any) -> int:
+    if isinstance(value, bool):
+        return 0
+    try:
+        number = Decimal(str(value).strip().replace(",", ""))
+    except (InvalidOperation, ValueError):
+        return 0
+    if not number.is_finite() or number < 0:
+        return 0
+    return int(number)
+
+
+def _common_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float, Decimal)):
+        return value != 0
+    return str(value or "").strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 class _NoRedirectHandler(HTTPRedirectHandler):

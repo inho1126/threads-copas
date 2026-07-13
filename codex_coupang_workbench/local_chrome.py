@@ -16,16 +16,54 @@ class LocalChromeError(RuntimeError):
 
 
 CHROME_EXTRACT_SCRIPT = """
-(() => JSON.stringify({
-  title: document.title || "",
-  h1: document.querySelector("h1")?.textContent?.trim() || "",
-  prodTitle: document.querySelector(".prod-buy-header__title")?.textContent?.trim() || "",
-  ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute("content") || "",
-  twitterTitle: document.querySelector('meta[name="twitter:title"]')?.getAttribute("content") || "",
-  imageUrl: document.querySelector('meta[property="og:image"]')?.getAttribute("content") || "",
-  url: location.href,
-  bodyHead: (document.body?.innerText || "").slice(0, 800)
-}))()
+(() => {
+  const clean = (value) => String(value || "").replace(/\\s+/g, " ").trim();
+  const texts = (selector) => Array.from(document.querySelectorAll(selector))
+    .map((el) => clean(el.innerText || el.textContent || el.getAttribute("alt") || ""))
+    .filter(Boolean);
+  const attrs = (selector, attr) => Array.from(document.querySelectorAll(selector))
+    .map((el) => el.getAttribute(attr) || "")
+    .filter(Boolean);
+  const unique = (items) => [...new Set(items.map(clean).filter(Boolean))];
+  const detailSelectors = [
+    "#productDetail",
+    ".product-detail",
+    ".prod-description",
+    ".sdp-product-detail",
+    "[class*=product-detail]",
+    "[class*=description]",
+  ];
+  const reviewSelectors = [
+    ".product-review",
+    ".sdp-review",
+    ".sdp-review__article__list__review__content",
+    ".js_reviewArticleContent",
+    "[class*=review]",
+  ];
+  const detailTexts = unique(detailSelectors.flatMap(texts))
+    .filter((text) => text.length > 20)
+    .slice(0, 8);
+  const detailImages = unique(attrs(
+    "#productDetail img, .product-detail img, .prod-description img, [class*=product-detail] img",
+    "src"
+  )).slice(0, 30);
+  const reviewBlocks = unique(reviewSelectors.flatMap(texts))
+    .filter((text) => text.length > 80)
+    .slice(0, 4);
+  return JSON.stringify({
+    title: document.title || "",
+    h1: document.querySelector("h1")?.textContent?.trim() || "",
+    prodTitle: document.querySelector(".prod-buy-header__title")?.textContent?.trim() || "",
+    ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute("content") || "",
+    twitterTitle: document.querySelector('meta[name="twitter:title"]')?.getAttribute("content") || "",
+    imageUrl: document.querySelector('meta[property="og:image"]')?.getAttribute("content") || "",
+    url: location.href,
+    bodyHead: (document.body?.innerText || "").slice(0, 800),
+    detailTexts,
+    detailImages,
+    reviewBlocks
+  });
+})()
 """.strip()
 
 CHROME_APPLESCRIPT = """
@@ -46,6 +84,18 @@ on run argv
       end try
     end repeat
     delay 2
+    repeat with i from 1 to 14
+      tell targetTab to execute javascript "window.scrollBy(0, Math.floor(window.innerHeight * 0.85));"
+      delay 0.35
+    end repeat
+    try
+      tell targetTab to execute javascript "(() => { const clean = s => (s || '').trim(); const target = Array.from(document.querySelectorAll('a,button,li,div')).find(el => /상품평|상품 리뷰|리뷰/.test(clean(el.innerText || el.textContent))); if (target) { target.scrollIntoView({block: 'center'}); target.click(); } })()"
+      delay 1.5
+      repeat with i from 1 to 8
+        tell targetTab to execute javascript "window.scrollBy(0, Math.floor(window.innerHeight * 0.9));"
+        delay 0.25
+      end repeat
+    end try
     tell targetTab to return execute javascript extractionScript
   end tell
 end run
@@ -101,8 +151,31 @@ def _context_from_payload(product_url: str, raw_payload: str) -> ProductContext:
         resolved_url=resolved_url,
         page_title=title,
         image_url=_normalize_url(_clean_text(payload.get("imageUrl"))),
-        facts=["Chrome에서 확인한 상품명"],
+        facts=_facts_from_payload(payload),
     )
+
+
+def _facts_from_payload(payload: dict[str, Any]) -> list[str]:
+    facts = ["Chrome에서 확인한 상품명"]
+    for text in _clean_list(payload.get("detailTexts"))[:4]:
+        facts.append(f"상세: {_truncate_fact(text)}")
+    detail_images = _clean_list(payload.get("detailImages"))
+    if detail_images:
+        facts.append(f"상세 이미지 {len(detail_images)}개 확인")
+    for text in _clean_list(payload.get("reviewBlocks"))[:2]:
+        facts.append(f"상품평: {_truncate_fact(text, max_length=420)}")
+    return facts
+
+
+def _clean_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [_clean_text(item) for item in value if _clean_text(item)]
+
+
+def _truncate_fact(value: str, max_length: int = 180) -> str:
+    text = _clean_text(value)
+    return text if len(text) <= max_length else f"{text[:max_length].rstrip()}..."
 
 
 def _best_product_title(payload: dict[str, Any]) -> str:

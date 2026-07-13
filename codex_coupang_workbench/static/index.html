@@ -3,221 +3,274 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Threads Coupang Publisher</title>
-    <link rel="stylesheet" href="static/styles.css?v=20260709-post-link" />
+    <meta name="color-scheme" content="light" />
+    <title>Curio Studio</title>
+    <link rel="stylesheet" href="static/styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <div class="brand-title">Threads Publisher</div>
-          <div class="brand-subtitle">Coupang Partners</div>
-        </div>
-        <nav class="nav">
-          <a href="#publish">Publish</a>
-          <a href="#profiles">Profiles</a>
-          <a href="#settings">Settings</a>
-          <a href="#records">Records</a>
-        </nav>
-        <div class="status-box">
-          <span class="status-dot" id="status-dot"></span>
-          <span id="health-text">checking</span>
-        </div>
-      </aside>
+    <a class="skip-link" href="#studio-workspace">작업 영역으로 건너뛰기</a>
 
-      <main class="workspace">
-        <header class="topbar">
-          <div>
-            <h1>쿠팡 링크로 Threads 발행</h1>
-            <p>쿠팡 URL만 입력하고, 프로필을 고른 뒤 글을 확인하고 발행합니다.</p>
-          </div>
-          <button class="ghost-button" id="refresh-button" type="button">Refresh</button>
-        </header>
-
-        <section class="section-grid">
-          <section class="panel" id="settings">
-            <div class="panel-header">
-              <h2>API Settings</h2>
-              <span>local frontend</span>
+    <header class="app-header">
+      <div class="brand-lockup">
+        <span class="brand-mark" aria-hidden="true">C</span>
+        <div>
+          <strong>Curio Studio</strong>
+          <span>상품에서 호기심 콘텐츠까지</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="button button-secondary" id="new-workflow-button" type="button">새 작업</button>
+        <details class="settings-popover" id="settings-drawer">
+          <summary class="button button-quiet">연동 설정</summary>
+          <form id="settings-form" class="settings-form">
+            <div class="settings-heading">
+              <div>
+                <strong>서비스 연동</strong>
+                <p>키 값은 화면과 로그에 다시 표시하지 않습니다.</p>
+              </div>
             </div>
-            <form id="settings-form" class="form-grid">
-              <label class="wide">
-                Threads Service URL
-                <input name="threads_service_url" autocomplete="off" placeholder="https://sinabro-ai.com/threads-copas" />
-              </label>
-              <label class="wide">
-                Threads Service API Key
-                <input name="threads_service_api_key" type="password" autocomplete="new-password" placeholder="AWS bridge API key" data-secret-field />
+            <label>
+              Threads Service URL
+              <input name="threads_service_url" type="url" autocomplete="off" placeholder="https://example.com/threads-copas" />
+            </label>
+            <label>
+              Threads Service API Key
+              <input name="threads_service_api_key" type="password" autocomplete="new-password" placeholder="저장된 값 유지" />
+            </label>
+            <div class="field-pair">
+              <label>
+                쿠팡 Access Key
+                <input name="coupang_access_key" type="password" autocomplete="new-password" placeholder="저장된 값 유지" />
               </label>
               <label>
-                Coupang Access Key
-                <input name="coupang_access_key" type="password" autocomplete="new-password" placeholder="Coupang Partners Access Key" data-secret-field />
+                쿠팡 Secret Key
+                <input name="coupang_secret_key" type="password" autocomplete="new-password" placeholder="저장된 값 유지" />
+              </label>
+            </div>
+            <div class="field-pair">
+              <label>
+                쿠팡 Sub ID
+                <input name="coupang_sub_id" autocomplete="off" />
               </label>
               <label>
-                Coupang Secret Key
-                <input name="coupang_secret_key" type="password" autocomplete="new-password" placeholder="Coupang Partners Secret Key" data-secret-field />
-              </label>
-              <label>
-                Coupang Sub ID
-                <input name="coupang_sub_id" autocomplete="off" placeholder="sub ID" />
-              </label>
-              <label class="wide">
-                Coupang Channel IDs
-                <textarea name="coupang_channel_ids" rows="3" autocomplete="off">bonggushop
-sinabroai
-sinabroinfo</textarea>
-              </label>
-              <label>
-                Codex Model
+                Codex 모델
                 <input name="codex_model" autocomplete="off" placeholder="gpt-5.5" />
               </label>
-              <div class="wide form-actions">
-                <button class="primary-button" type="submit">Save Settings</button>
-                <span id="settings-message" class="inline-message"></span>
-              </div>
-            </form>
-          </section>
-
-          <section class="panel" id="profiles">
-            <div class="panel-header">
-              <h2>Profiles</h2>
-              <span id="threads-profile-count">0 profiles</span>
             </div>
-            <div class="form-actions">
-              <button class="primary-button" id="threads-import-button" type="button">Import Current Account</button>
-              <span id="threads-profile-message" class="inline-message"></span>
-            </div>
-            <div id="threads-profiles-list" class="profile-list"></div>
-          </section>
-        </section>
-
-        <section class="panel" id="publish">
-          <div class="panel-header">
-            <h2>Draft & Publish</h2>
-            <span id="selected-product-label">no product</span>
-          </div>
-          <form id="threads-draft-form" class="form-grid">
-            <input name="image_url" type="hidden" />
             <label>
-              발행 프로필
-              <select name="profile_key" id="threads-profile-select"></select>
+              쿠팡 채널 ID
+              <textarea name="coupang_channel_ids" rows="3" autocomplete="off"></textarea>
             </label>
             <label>
-              쿠팡 채널ID
-              <select name="coupang_channel_id" id="coupang-channel-select"></select>
-            </label>
-            <label class="wide">
-              쿠팡 URL
-              <div class="input-action-row two-actions">
-                <input name="product_url" required placeholder="https://link.coupang.com/a/..." />
-                <button class="small-button" id="coupang-preview-button" type="button">확인</button>
-                <button class="small-button" id="coupang-chrome-preview-button" type="button">Chrome 확인</button>
-              </div>
-            </label>
-            <label class="wide">
-              댓글 딥링크 URL
-              <div class="input-action-row">
-                <input name="partner_url" autocomplete="off" placeholder="https://link.coupang.com/a/... 직접 입력하면 댓글에 이 링크를 사용합니다." />
-                <button class="small-button" id="coupang-deeplink-button" type="button">딥링크 만들기</button>
-              </div>
-            </label>
-            <label class="wide" id="product-name-fallback" hidden>
-              상품명 직접 입력
-              <input name="product_name" autocomplete="off" placeholder="자동 확인이 안 되면 상품명을 입력하고 Generate Thread를 누르세요." />
-            </label>
-            <div class="wide product-preview" id="coupang-product-preview" hidden></div>
-            <label class="wide">
               Codex 본문 프롬프트
-              <textarea name="codex_threads_prompt" rows="10" autocomplete="off" placeholder="상품 확인 후 자동 입력됩니다."></textarea>
+              <textarea name="codex_threads_prompt" rows="5" autocomplete="off" placeholder="비워두면 상품에 맞춰 자동으로 구성합니다."></textarea>
             </label>
-            <div class="wide form-actions">
-              <button class="small-button" id="codex-threads-prompt-button" type="button">본문 프롬프트 다시 만들기</button>
-              <span id="codex-threads-prompt-message" class="inline-message"></span>
-            </div>
-            <label class="wide">
-              Codex 이미지 프롬프트
-              <textarea name="codex_image_prompt" rows="9" autocomplete="off" placeholder="상품 확인 후 자동 입력됩니다."></textarea>
-            </label>
-            <div class="wide form-actions">
-              <button class="small-button" id="codex-image-prompt-button" type="button">Codex 이미지 프롬프트 만들기</button>
-              <span id="codex-image-prompt-message" class="inline-message"></span>
-            </div>
-            <label class="wide">
-              Codex 후킹 이미지 Base64
-              <textarea name="generated_image_base64" rows="4" autocomplete="off" placeholder="비워두면 Generate Thread에서 Codex CLI가 AI 일러스트 후킹 이미지를 자동 생성합니다. 직접 만든 이미지를 쓰려면 base64 또는 data:image/png;base64,... 값을 붙여넣으세요."></textarea>
-            </label>
-            <label class="wide">
-              후킹 이미지 URL
-              <input name="hook_image_url" autocomplete="off" placeholder="Generate Thread 또는 이미지 다시 만들기 후 자동 입력됩니다." />
-            </label>
-            <div class="wide hook-image-checks">
-              <label>
-                <input name="skip_hook_image" type="checkbox" value="true" />
-                이미지 없이 글만 만들기
-              </label>
-            </div>
-            <input name="hook_image_no_product" type="hidden" value="true" />
-            <input name="hook_image_permission_reviewed" type="hidden" value="true" />
-            <div class="wide form-actions">
-              <button class="small-button" id="threads-media-upload-button" type="button">이미지 URL 만들기</button>
-              <button class="small-button" id="threads-auto-image-button" type="button">이미지 다시 만들기</button>
-              <span id="threads-media-message" class="inline-message"></span>
-            </div>
-            <div class="wide form-actions">
-              <button class="primary-button" type="submit">Generate Thread</button>
-              <span id="coupang-preview-message" class="inline-message"></span>
-              <span id="threads-draft-message" class="inline-message"></span>
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">설정 저장</button>
+              <span class="form-message" id="settings-message" role="status"></span>
             </div>
           </form>
+        </details>
+      </div>
+    </header>
 
-          <label class="thread-preview-label">
-            Threads 본문 미리보기
-            <textarea id="threads-preview" rows="10" placeholder="글을 생성하면 본문을 확인하고 수정할 수 있습니다."></textarea>
-          </label>
-          <label class="thread-preview-label">
-            댓글 미리보기
-            <textarea id="threads-comment-preview" rows="5" placeholder="쿠팡 파트너스 고지와 링크가 댓글로 들어갑니다."></textarea>
-          </label>
-          <div class="thread-image-preview is-empty" id="threads-image-preview"></div>
-          <div class="form-actions publish-actions">
-            <button class="primary-button" id="threads-publish-button" type="button">Publish to Threads</button>
-            <span id="threads-publish-message" class="inline-message"></span>
-          </div>
-        </section>
-
-        <section class="panel" id="records">
-          <div class="panel-header">
-            <h2>Publish Records</h2>
-            <span id="record-count">0 records</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>발행 시각</th>
-                  <th>상품</th>
-                  <th>발행 프로필</th>
-                  <th>Threads Post ID</th>
-                  <th>조회수</th>
-                  <th>좋아요</th>
-                  <th>댓글</th>
-                  <th>리포스트</th>
-                  <th>인용</th>
-                  <th>공유</th>
-                  <th>지표</th>
-                </tr>
-              </thead>
-              <tbody id="records-body">
-                <tr>
-                  <td colspan="11" class="empty-cell">No publish records yet.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </main>
+    <div class="service-status-strip" id="service-status-strip" aria-label="서비스 연결 상태">
+      <span class="service-label">서비스 상태</span>
+      <span class="status-chip" id="service-backend-status"><i></i>Studio 확인 중</span>
+      <span class="status-chip" id="service-rednote-status"><i></i>RedNote 대기</span>
+      <span class="status-chip" id="service-threads-status"><i></i>Threads 확인 중</span>
+      <span class="service-note">실제 게시 전 마지막 단계에서 한 번 더 확인합니다.</span>
     </div>
 
-    <script src="static/app.js?v=20260709-post-link"></script>
+    <main class="studio-layout" id="studio-workspace">
+      <nav class="step-rail" role="tablist" aria-label="콘텐츠 제작 단계">
+        <div class="rail-intro">
+          <span class="eyebrow">새 콘텐츠</span>
+          <h1>한 번에 만드는<br />Threads 콘텐츠</h1>
+          <p>완료된 선택은 다음 단계로 이동해도 그대로 유지됩니다.</p>
+        </div>
+        <button id="step-account" class="step-button is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-account" tabindex="0" data-studio-step="account">
+          <span class="step-number">01</span><span><strong>계정</strong><small>발행할 Threads 선택</small></span>
+        </button>
+        <button id="step-product" class="step-button" type="button" role="tab" aria-selected="false" aria-controls="panel-product" tabindex="-1" data-studio-step="product">
+          <span class="step-number">02</span><span><strong>상품</strong><small>쿠팡 검색과 딥링크</small></span>
+        </button>
+        <button id="step-copy" class="step-button" type="button" role="tab" aria-selected="false" aria-controls="panel-copy" tabindex="-1" data-studio-step="copy">
+          <span class="step-number">03</span><span><strong>문구</strong><small>페르소나별 후킹 본문</small></span>
+        </button>
+        <button id="step-rednote" class="step-button" type="button" role="tab" aria-selected="false" aria-controls="panel-rednote" tabindex="-1" data-studio-step="rednote">
+          <span class="step-number">04</span><span><strong>RedNote</strong><small>중국어 검색과 영상 선택</small></span>
+        </button>
+        <button id="step-media" class="step-button" type="button" role="tab" aria-selected="false" aria-controls="panel-media" tabindex="-1" data-studio-step="media">
+          <span class="step-number">05</span><span><strong>미디어</strong><small>영상 또는 대표 이미지</small></span>
+        </button>
+        <button id="step-publish" class="step-button" type="button" role="tab" aria-selected="false" aria-controls="panel-publish" tabindex="-1" data-studio-step="publish">
+          <span class="step-number">06</span><span><strong>게시</strong><small>최종 확인과 발행</small></span>
+        </button>
+      </nav>
+
+      <section class="workspace-column">
+        <div class="workspace-heading">
+          <div>
+            <span class="eyebrow" id="current-step-label">STEP 01</span>
+            <h2 id="current-step-title">먼저 발행 계정을 골라주세요</h2>
+          </div>
+          <span class="job-badge" id="current-job-badge">아직 저장된 작업 없음</span>
+        </div>
+
+        <section class="step-panel is-active" id="panel-account" role="tabpanel" aria-labelledby="step-account" data-studio-panel="account">
+          <div class="panel-heading">
+            <div><span class="eyebrow">Threads 계정</span><h3>어디에 게시할까요?</h3></div>
+            <button class="button button-secondary" id="threads-import-button" type="button">현재 계정 가져오기</button>
+          </div>
+          <label for="threads-profile-select">연동할 Threads 계정</label>
+          <select id="threads-profile-select" name="profile_key">
+            <option value="">연결된 계정을 불러오는 중</option>
+          </select>
+          <p class="field-help">게시 직전에도 선택한 계정을 다시 보여드립니다.</p>
+          <div id="threads-profiles-list" class="account-list" aria-live="polite"></div>
+          <p class="form-message" id="threads-profile-message" role="status"></p>
+          <div class="panel-footer"><span></span><button class="button button-primary" type="button" data-next-step="product">상품 고르기</button></div>
+        </section>
+
+        <section class="step-panel" id="panel-product" role="tabpanel" aria-labelledby="step-product" data-studio-panel="product" hidden>
+          <div class="panel-heading">
+            <div><span class="eyebrow">쿠팡 상품</span><h3>상품명으로 먼저 찾아보세요</h3></div>
+            <span class="panel-hint">최대 10개</span>
+          </div>
+          <form id="product-search-form" class="search-form">
+            <label class="sr-only" for="product-search-input">쿠팡 상품명 검색</label>
+            <input id="product-search-input" name="keyword" autocomplete="off" placeholder="예: 차량용 목쿠션" required />
+            <button class="button button-primary" type="submit">상품 검색</button>
+          </form>
+          <div class="channel-row">
+            <label for="coupang-channel-select">쿠팡 채널 ID</label>
+            <select id="coupang-channel-select"><option value="">기본 Sub ID</option></select>
+          </div>
+          <details class="manual-link-box">
+            <summary>상품 URL을 직접 입력할게요</summary>
+            <div class="manual-link-fields">
+              <label for="manual-product-url">쿠팡 상품 URL</label>
+              <input id="manual-product-url" type="url" placeholder="https://www.coupang.com/vp/products/..." />
+              <label for="product-name-fallback">상품명 직접 입력</label>
+              <input id="product-name-fallback" placeholder="자동 확인이 안 될 때만 입력" />
+              <div class="inline-actions">
+                <button class="button button-secondary" id="coupang-chrome-preview-button" type="button">Chrome에서 확인</button>
+                <button class="button button-secondary" id="manual-product-button" type="button">이 상품 사용</button>
+              </div>
+            </div>
+          </details>
+          <div id="coupang-product-preview">
+            <div id="product-results" class="product-grid" aria-live="polite">
+              <div class="empty-state"><strong>검색 결과가 여기에 표시됩니다.</strong><span>정확한 상품명을 입력하면 선택지가 더 좋아집니다.</span></div>
+            </div>
+          </div>
+          <p class="form-message" id="product-message" role="status"></p>
+          <div class="panel-footer"><button class="button button-quiet" type="button" data-prev-step="account">이전</button><button class="button button-primary" type="button" data-next-step="copy">문구 만들기</button></div>
+        </section>
+
+        <section class="step-panel" id="panel-copy" role="tabpanel" aria-labelledby="step-copy" data-studio-panel="copy" hidden>
+          <div class="panel-heading">
+            <div><span class="eyebrow">후킹 문구</span><h3>결이 다른 문구를 한 번에 비교해보세요</h3></div>
+            <span class="panel-hint">고정 6개 + 커스텀 1개</span>
+          </div>
+          <div class="custom-persona-box">
+            <label for="custom-persona-input">커스텀 페르소나 <span>선택</span></label>
+            <div class="input-with-action">
+              <input id="custom-persona-input" maxlength="300" placeholder="예: 친구가 툭 던지는 짧은 대화체" />
+              <button class="button button-primary" id="generate-copy-button" type="button">문구 생성</button>
+            </div>
+          </div>
+          <div id="threads-variant-selector">
+            <div id="persona-grid" class="persona-grid" aria-live="polite">
+              <div class="empty-state"><strong>상품을 선택하면 6가지 문구를 만듭니다.</strong><span>짧고 직접적인 호기심 중심 문구로 구성됩니다.</span></div>
+              <button type="button" data-thread-variant="relatable" hidden>현실 공감형</button>
+              <button type="button" data-thread-variant="shock" hidden>충격 문장형</button>
+              <button type="button" data-thread-variant="story" hidden>대화·사연형</button>
+              <button type="button" data-thread-variant="viral" hidden>바이럴 발견형</button>
+            </div>
+          </div>
+          <div class="selected-copy-editor" id="selected-copy-editor" hidden>
+            <div class="editor-heading"><label for="selected-copy-text">선택한 본문</label><div><button class="button button-quiet" id="regenerate-copy-button" type="button">이 버전 다시 만들기</button><button class="button button-secondary" id="save-copy-button" type="button">수정 저장</button></div></div>
+            <textarea id="selected-copy-text" rows="7" maxlength="500"></textarea>
+          </div>
+          <p class="form-message" id="copy-message" role="status"></p>
+          <div class="panel-footer"><button class="button button-quiet" type="button" data-prev-step="product">이전</button><button class="button button-primary" type="button" data-next-step="rednote">RedNote 찾기</button></div>
+        </section>
+
+        <section class="step-panel" id="panel-rednote" role="tabpanel" aria-labelledby="step-rednote" data-studio-panel="rednote" hidden>
+          <div class="panel-heading">
+            <div><span class="eyebrow">RedNote 검색</span><h3>중국어 검색어로 영상 게시물을 찾습니다</h3></div>
+            <span class="panel-hint">로그인된 Chrome 사용</span>
+          </div>
+          <label for="rednote-query">RedNote 검색어</label>
+          <div class="input-with-action query-actions">
+            <input id="rednote-query" maxlength="50" placeholder="쿠팡 검색어를 입력하세요" autocomplete="off" />
+            <button class="button button-secondary" id="regenerate-query-button" type="button">쿠팡 검색어로 되돌리기</button>
+            <button class="button button-primary" id="rednote-search-button" type="button">중국어로 영상 검색</button>
+          </div>
+          <p class="field-help">쿠팡 검색어가 자동으로 입력됩니다. 필요하면 수정하세요. 영상 검색을 누르면 입력한 내용을 중국어로 번역해 새 Chrome 탭에서 검색합니다.</p>
+          <div id="rednote-results" class="rednote-grid" aria-live="polite">
+            <div class="empty-state"><strong>Chrome에서 찾은 영상만 여기에 표시됩니다.</strong><span>로그인이 풀렸다면 Chrome에서 RedNote에 먼저 로그인해주세요.</span></div>
+          </div>
+          <p class="form-message" id="rednote-message" role="status"></p>
+          <div class="panel-footer"><button class="button button-quiet" type="button" data-prev-step="copy">이전</button><button class="button button-primary" id="download-rednote-button" type="button">선택 영상 다운로드</button></div>
+        </section>
+
+        <section class="step-panel" id="panel-media" role="tabpanel" aria-labelledby="step-media" data-studio-panel="media" hidden>
+          <div class="panel-heading">
+            <div><span class="eyebrow">미디어 구성</span><h3>영상 1개 + 대표 이미지 1장</h3></div>
+            <span class="panel-hint" id="representative-status">대표 장면 대기</span>
+          </div>
+          <div id="media-assets" class="media-assets" aria-live="polite">
+            <div class="empty-state"><strong>영상을 선택하면 자동으로 대표 장면을 고릅니다.</strong><span>서로 다른 장면을 3~5장 JPG로 저장합니다.</span></div>
+          </div>
+          <p class="field-help">영상 1개와 JPG 이미지 1장을 골라 캐러셀로 게시합니다. 각 종류에서 하나씩만 선택할 수 있습니다.</p>
+          <p class="form-message" id="media-message" role="status"></p>
+          <div class="panel-footer"><button class="button button-quiet" type="button" data-prev-step="rednote">이전</button><button class="button button-primary" id="save-media-selection-button" type="button">선택 저장하고 최종 확인</button></div>
+        </section>
+
+        <section class="step-panel" id="panel-publish" role="tabpanel" aria-labelledby="step-publish" data-studio-panel="publish" hidden>
+          <div class="panel-heading">
+            <div><span class="eyebrow">최종 미리보기</span><h3>게시되는 내용을 마지막으로 확인하세요</h3></div>
+            <span class="panel-hint">실제 외부 게시</span>
+          </div>
+          <div id="final-preview" class="final-preview">
+            <div class="empty-state"><strong>앞 단계를 완료하면 최종 미리보기가 열립니다.</strong></div>
+          </div>
+          <div class="policy-stack">
+            <div class="policy-note" id="affiliate-disclosure-warning"><strong>광고 고지와 딥링크는 잠겨 있습니다.</strong><span>쿠팡 파트너스 고지 문구와 선택 상품의 딥링크는 첫 댓글로만 게시됩니다.</span></div>
+            <div class="policy-note" id="media-rights-warning"><strong>미디어 사용 권리를 확인하세요.</strong><span>선택한 RedNote 영상 또는 이미지의 재사용 권한과 플랫폼 정책 책임은 게시자에게 있습니다.</span></div>
+          </div>
+          <label class="publish-confirmation" for="publish-confirmation">
+            <input id="publish-confirmation" type="checkbox" />
+            <span>계정, 본문, 미디어, 광고 고지 댓글을 모두 확인했습니다.</span>
+          </label>
+          <p class="form-message" id="publish-message" role="status"></p>
+          <div class="panel-footer"><button class="button button-quiet" type="button" data-prev-step="media">이전</button><div class="publish-buttons"><button class="button button-secondary" id="retry-reply-button" type="button" hidden>댓글만 다시 게시</button><button class="button button-primary button-publish" id="studio-publish-button" type="button" disabled>Threads에 게시</button></div></div>
+        </section>
+
+        <section class="history-panel" aria-labelledby="history-title">
+          <div class="panel-heading"><div><span class="eyebrow">게시 기록</span><h3 id="history-title">최근 콘텐츠</h3><small>조회수 · 좋아요 지표</small></div><button class="button button-quiet" id="refresh-history-button" type="button">새로고침</button></div>
+          <div id="publish-history-list" class="history-list" aria-live="polite"><div class="empty-state"><strong>아직 게시 기록이 없습니다.</strong></div></div>
+        </section>
+      </section>
+
+      <aside class="summary-card" id="studio-summary" aria-label="현재 작업 요약">
+        <div class="summary-heading"><span class="eyebrow">현재 선택</span><strong>작업 요약</strong></div>
+        <dl>
+          <div><dt>Threads</dt><dd id="summary-profile">선택 전</dd></div>
+          <div><dt>상품</dt><dd id="summary-product">선택 전</dd></div>
+          <div><dt>문구</dt><dd id="summary-copy">선택 전</dd></div>
+          <div><dt>RedNote</dt><dd id="summary-rednote">선택 전</dd></div>
+          <div><dt>미디어</dt><dd id="summary-media">선택 전</dd></div>
+        </dl>
+        <div class="summary-progress"><span id="summary-progress-bar"></span></div>
+        <small id="summary-progress-label">0 / 6 단계 완료</small>
+      </aside>
+    </main>
+
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+    <script type="module" src="static/app.js"></script>
   </body>
 </html>

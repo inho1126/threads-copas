@@ -6,6 +6,8 @@ __pycache__/
 .playwright-mcp/
 
 workbench_data/
+workbench_data/rednote/
+rednote_sidecar/.rednote-runtime/
 *.sqlite
 *.sqlite3
 *.log

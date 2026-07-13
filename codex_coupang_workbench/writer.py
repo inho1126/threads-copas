@@ -193,18 +193,35 @@ def generate_threads_post(
     product_facts: list[str] | None = None,
     memo: str = "",
     persona: str = "",
+    style: str = "relatable",
 ) -> str:
     clean_name = product_name.strip() or "추천 상품"
     facts = _normalize_facts(product_facts or [])
     if memo.strip():
         facts.extend(_normalize_facts([memo]))
     public_facts = _public_content_facts(_dedupe(facts))
-    return _threads_curiosity_post(clean_name, public_facts)
+    relatable = _threads_curiosity_post(clean_name, public_facts)
+    if style in {"shock", "problem_solution"}:
+        return _threads_shock_post(relatable)
+    if style == "story":
+        return _threads_story_post(relatable)
+    if style in {"viral", "curiosity"}:
+        return _threads_viral_post(relatable)
+    if style == "honest_discovery":
+        return _threads_honest_discovery_post(relatable)
+    if style == "conversion":
+        return _threads_conversion_post(relatable)
+    return relatable
 
 
-def generate_threads_comment(product_url: str) -> str:
+def generate_threads_comment(product_url: str, product_name: str = "") -> str:
     clean_url = product_url.strip()
-    return f"{DISCLOSURE}\n\n{clean_url}" if clean_url else DISCLOSURE
+    parts = [DISCLOSURE]
+    if product_name.strip():
+        parts.append(product_name.strip())
+    if clean_url:
+        parts.append(clean_url)
+    return "\n\n".join(parts)
 
 
 def _build_tags(product_name: str) -> list[str]:
@@ -235,9 +252,9 @@ def _threads_curiosity_post(product_name: str, facts: list[str]) -> str:
     if _has_any(context, ("비상", "탈출", "도어", "개폐", "스트랩", "손잡이")):
         return "\n\n".join(
             [
-                "뒷좌석 탄 사람한테\n“문 안 열리면 어떻게 나와?”\n이거 물어보면 대부분 바로 대답 못 함.",
-                "근데 이건 평소엔 아무도 신경 안 쓰다가\n딱 한 번 필요한 순간이 오면\n진짜 표정 굳는 종류임.",
-                "차 꾸미는 건 취향인데\n이런 건 약간 다른 문제라서 더 찝찝함.",
+                "뒷좌석에서 문이 바로 안 열리는 순간은\n평소엔 생각도 안 하던 부분을 보게 만듦.",
+                "매일 쓸 일은 없어 보여도\n필요한 순간엔 찾는 과정부터 짧아야 함.",
+                "차 안에 이런 방법이 있다는 걸\n왜 미리 알아두는지 조금 이해되는 부분임.",
             ]
         )
     if _has_any(context, ("콘솔", "수납", "트레이", "정리함")) and _has_any(
@@ -245,56 +262,184 @@ def _threads_curiosity_post(product_name: str, facts: list[str]) -> str:
     ):
         return "\n\n".join(
             [
-                "차 타고 나서\n“그거 어디 뒀지?” 한 번이라도 해봤으면\n이런 쪽을 그냥 지나치기 어려움.",
-                "평소엔 별거 아닌데\n컵홀더 주변이랑 콘솔 쪽이 어수선해지는 순간\n갑자기 엄청 신경 쓰임.",
-                "차 안은 넓어 보여도\n작은 물건 하나 굴러다니면\n이상하게 계속 눈에 밟힘.",
+                "차에 타고 나서 카드나 열쇠를 찾느라\n콘솔 주변을 한 번씩 뒤질 때가 있음.",
+                "작은 물건은 금방 굴러다니는데\n막상 꺼낼 땐 손에 바로 안 잡힘.",
+                "자리 하나를 나눠 쓰는 방식이\n왜 차 안에서 유독 눈에 들어오는지 알 것 같음.",
             ]
         )
     if _has_any(context, ("목베개", "목쿠션", "헤드레스트", "메모리폼")):
         return "\n\n".join(
             [
-                "차 오래 타는 사람들 중에\n이거 한 번 신경 쓰기 시작하면\n그다음부터 계속 거슬릴 수 있음.",
-                "처음엔 “굳이?” 싶은데\n막상 장거리 한 번 타면\n왜 사람들이 이런 걸 찾는지 바로 이해됨.",
-                "차는 조용한데\n몸이 먼저 불편하다고 말하는 순간이 있음.",
+                "차를 오래 타고 내렸는데\n목부터 천천히 돌리게 되는 날이 있음.",
+                "운전할 땐 자세를 바꾸기도 어렵고\n헤드레스트와 목 사이가 계속 애매하게 남음.",
+                "그 빈자리를 받쳐주는 방식이\n왜 장거리 전에 생각나는지 알 것 같음.",
+            ]
+        )
+    if _has_any(context, ("휴족", "쿨링시트", "발바닥", "종아리", "다리", "풋케어")):
+        return "\n\n".join(
+            [
+                "하루 종일 걷거나 서 있던 날엔\n집에 와서 누워도 다리가 계속 존재감이 있음.",
+                "발바닥이나 종아리를 잠깐 챙기는 일인데\n막상 귀찮으면 그냥 넘기기 쉬움.",
+                "붙여두고 쉬는 방식이\n왜 이런 날 자꾸 눈에 들어오는지 알 것 같음.",
             ]
         )
     if _has_any(context, ("선풍기", "쿨러", "냉각", "에어컨", "손풍기")):
         return "\n\n".join(
             [
-                "요즘 밖에서 이거 들고 있으면\n진짜로 한 번씩 쳐다봄.",
-                "그냥 바람 나오는 줄 알았는데\n얼굴 가까이 대는 순간\n“어? 이건 좀 다른데?” 싶은 쪽임.",
-                "더위 많이 타는 사람은\n이런 거 한 번 써보면\n여름 외출 기준이 좀 바뀔 수도 있음.",
+                "여름엔 횡단보도 하나만 건너도\n얼굴에 열기가 먼저 올라오는 날이 있음.",
+                "그늘을 찾아도 바람이 없으면\n잠깐 멈춘다고 금방 편해지진 않음.",
+                "가까이 두고 바로 쓰는 방식이\n왜 외출 전에 생각나는지 알 것 같음.",
             ]
         )
     if _has_any(context, ("썬쉐이드", "선루프", "차광", "햇빛", "그늘")):
         return "\n\n".join(
             [
-                "여름에 차 타자마자\n머리 위부터 뜨겁다고 느껴본 사람은\n이거 그냥 못 지나칠 수 있음.",
-                "처음엔 햇빛 좀 들어오는 정도라고 생각하는데\n어느 순간 차 안 공기가 다르게 느껴짐.",
-                "차는 멀쩡한데\n천장이 먼저 계절을 알려주는 순간이 있음.",
+                "여름에 차 문을 열었는데\n좌석보다 머리 위 열기가 먼저 느껴질 때가 있음.",
+                "에어컨을 켜도 햇빛이 계속 들어오면\n차 안이 쉽게 편해지지 않음.",
+                "위쪽을 가리는 방식이\n왜 여름마다 다시 생각나는지 알 것 같음.",
             ]
         )
     if _has_any(context, ("강아지", "반려", "펫", "물티슈", "산책", "하네스")):
         return "\n\n".join(
             [
-                "산책 다녀와서\n집 들어가기 직전에 제일 난감한 순간이 있음.",
-                "그냥 대충 넘기려다가도\n발바닥이랑 털 한 번 보면\n갑자기 마음이 바뀜.",
-                "외출 가방에 이런 거 하나 있으면\n그 찝찝한 몇 초가 꽤 달라짐.",
+                "산책을 마치고 현관에 들어서면\n발바닥과 털부터 눈에 들어오는 날이 있음.",
+                "집 안으로 들어간 뒤 다시 챙기려면 늦어서\n외출 가방에서 바로 꺼낼 수 있는지가 중요함.",
+                "그 짧은 순간을 정리하는 방식이\n왜 산책할 때마다 생각나는지 알 것 같음.",
+            ]
+        )
+    if _has_any(context, ("신발", "운동화", "구두")) and _has_any(
+        context, ("방수", "비 오는 날", "장마", "젖")
+    ):
+        return "\n\n".join(
+            [
+                "비 오는 날 현관에서\n밝은 신발을 신고 나가도 될지 잠깐 멈출 때가 있음.",
+                "우산은 챙겨도 발끝은 그대로라서\n작은 웅덩이 하나가 계속 신경 쓰임.",
+                "나가기 전에 미리 챙기는 방식이\n왜 장마철마다 눈에 들어오는지 알 것 같음.",
             ]
         )
     if _has_any(context, ("우산", "레인", "부츠", "장마", "방수")):
         return "\n\n".join(
             [
-                "비 오는 날엔\n집 나서기 전에 이미 승부가 나는 물건들이 있음.",
-                "없을 땐 그냥 참으면 된다고 생각하는데\n한 번 제대로 젖고 나면 기준이 바뀜.",
-                "장마철엔 작은 불편이 하루 기분을 통째로 끌고 감.",
+                "비가 애매하게 오는 날엔\n큰 우산을 들고 갈지부터 고민하게 됨.",
+                "가방 자리는 적게 쓰면서\n막상 펼쳤을 땐 몸을 제대로 가려야 함.",
+                "작게 챙기고 넓게 쓰는 방식이\n왜 날씨를 볼 때마다 생각나는지 알 것 같음.",
+            ]
+        )
+    if _has_any(context, ("체중계", "몸무게")):
+        return "\n\n".join(
+            [
+                "씻고 나오거나 옷을 갈아입을 때\n바닥 숫자를 한 번 확인하게 되는 순간이 있음.",
+                "매일 챙기겠다고 마음먹어도\n과정이 번거로우면 며칠 지나 손이 안 가게 됨.",
+                "눈에 잘 보이고 바로 확인되는 방식이\n왜 계속 생각나는지 조금 알 것 같음.",
+            ]
+        )
+    if _has_any(context, ("보조배터리", "충전기", "무선충전", "맥세이프")):
+        return "\n\n".join(
+            [
+                "밖에 나와서 배터리 숫자가 한 자리면\n그때부터 가방 속 케이블부터 찾게 됨.",
+                "기기마다 선을 따로 챙기면\n충전보다 정리하는 일이 더 번거로울 때가 있음.",
+                "가까이 두고 바로 채우는 방식이\n왜 외출할 때 눈에 들어오는지 알 것 같음.",
+            ]
+        )
+    if _has_any(context, ("방향제", "디퓨저", "향기", "냄새")):
+        return "\n\n".join(
+            [
+                "문을 열었을 때 남아 있는 냄새는\n매일 타는 사람보다 가끔 탄 사람이 먼저 알아챔.",
+                "향이 너무 강하면 그것대로 부담스럽고\n금방 사라지면 챙긴 의미가 없어짐.",
+                "공간에 은근히 남는 방식이\n왜 더 오래 고민되는지 알 것 같음.",
+            ]
+        )
+    if _has_any(context, ("텀블러", "물병", "물컵", "보틀")):
+        return "\n\n".join(
+            [
+                "물을 챙겨 나가려는데\n가방 안에서 세워둘 자리가 애매할 때가 있음.",
+                "눕히자니 새는 게 걱정되고\n세우자니 다른 물건이 잘 안 들어감.",
+                "들고 다니는 방식까지 편해야\n왜 자주 손이 가는지 알 것 같음.",
+            ]
+        )
+    if _has_any(context, ("신발", "샌들", "슬리퍼", "클로그", "크록스")):
+        return "\n\n".join(
+            [
+                "잠깐 나가는 날엔\n편하게 신을지 옷에 맞출지 현관에서 고민하게 됨.",
+                "발이 편해도 모양이 아쉽거나\n보기엔 괜찮아도 오래 걷기 부담스러운 경우가 있음.",
+                "그 중간을 찾는 방식이\n왜 신발장 앞에서 자꾸 생각나는지 알 것 같음.",
             ]
         )
     return "\n\n".join(
         [
-            "이거 처음 보면\n대부분 “굳이?” 쪽으로 생각할 수 있음.",
-            "근데 막상 필요한 상황이 오면\n그때부터는 계속 머릿속에 남는 종류임.",
-            "별거 아닌 것처럼 보이는데\n한 번 신경 쓰이기 시작하면 은근히 크게 느껴짐.",
+            "자주 쓰는 물건인데도\n막상 필요한 순간엔 손에 바로 안 잡힐 때가 있음.",
+            "기능이 많아서보다\n평소 불편한 한 장면을 줄여주는지가 더 중요함.",
+            "별것 아닌 사용 방식이\n왜 계속 눈에 남는지 조금 알 것 같음.",
+        ]
+    )
+
+
+def _threads_shock_post(relatable: str) -> str:
+    paragraphs = [paragraph for paragraph in relatable.split("\n\n") if paragraph.strip()]
+    context = paragraphs[0] if paragraphs else relatable
+    detail = paragraphs[1] if len(paragraphs) > 1 else "평소에는 대수롭지 않게 넘기기 쉬운 불편임."
+    return "\n\n".join(
+        [
+            "딱 한 번 제대로 불편해지면\n그다음부터는 모른 척하기 어려움.",
+            context,
+            detail,
+            "문제는 해결 방식이 생각보다 단순해 보인다는 것.\n그래서 더 궁금해짐.",
+        ]
+    )
+
+
+def _threads_story_post(relatable: str) -> str:
+    paragraphs = [paragraph for paragraph in relatable.split("\n\n") if paragraph.strip()]
+    context = paragraphs[0] if paragraphs else relatable
+    detail = paragraphs[1] if len(paragraphs) > 1 else "필요한 순간마다 같은 자리에서 손이 멈춤."
+    return "\n\n".join(
+        [
+            "“이거 매번 왜 이러지?”\n별일 아닌데 꼭 필요한 순간마다 같은 말이 나옴.",
+            context,
+            detail,
+            "설명보다 그 장면이 먼저 떠오르는 걸 보면\n사람들이 찾는 이유가 따로 있는 듯함.",
+        ]
+    )
+
+
+def _threads_viral_post(relatable: str) -> str:
+    paragraphs = [paragraph for paragraph in relatable.split("\n\n") if paragraph.strip()]
+    context = paragraphs[0] if paragraphs else relatable
+    detail = paragraphs[1] if len(paragraphs) > 1 else "알고 보면 평소 불편과 바로 이어지는 방식임."
+    return "\n\n".join(
+        [
+            "처음 보고 눈을 의심함.\n이런 방식이 여기 왜 있어?",
+            context,
+            detail,
+            "별거 아닐 줄 알았는데 자꾸 생각남.\n이거 나만 이제 안 건가.",
+        ]
+    )
+
+
+def _threads_honest_discovery_post(relatable: str) -> str:
+    paragraphs = [paragraph for paragraph in relatable.split("\n\n") if paragraph.strip()]
+    context = paragraphs[0] if paragraphs else relatable
+    detail = paragraphs[1] if len(paragraphs) > 1 else "알고 보면 생활의 짧은 순간과 맞닿아 있음."
+    return "\n\n".join(
+        [
+            "처음엔 굳이 이까지 싶었음.",
+            context,
+            detail,
+            "쓰는 장면를 알고 나니\n왜 찾는지는 솔직히 조금 이해됨.",
+        ]
+    )
+
+
+def _threads_conversion_post(relatable: str) -> str:
+    paragraphs = [paragraph for paragraph in relatable.split("\n\n") if paragraph.strip()]
+    context = paragraphs[0] if paragraphs else relatable
+    detail = paragraphs[1] if len(paragraphs) > 1 else "반복되는 불편일수록 작은 차이가 더 크게 보임."
+    return "\n\n".join(
+        [
+            "이 장면이 자주 반복된다면\n결국 보게 되는 건 복잡한 기능이 아님.",
+            context,
+            detail,
+            "누군가에게는 별거 아닐 수 있지만\n딱 그 순간이 있는 사람은 쓰임새부터 눈에 들어옴.",
         ]
     )
 
